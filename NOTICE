@@ -1,0 +1,17 @@
+sereview
+Copyright 2026 Sim Yunsup
+
+This product includes software derived from Open Code Review
+(alibaba/open-code-review), licensed under the Apache License, Version 2.0
+(https://github.com/alibaba/open-code-review).
+
+Derived material:
+  - The review rule taxonomy (security-focused rule set + severity levels).
+  - The deterministic review pipeline design:
+    diff parsing -> file bundling -> rule matching -> review packet.
+
+Changes from the original:
+  - Reimplemented in TypeScript (the original is written in Go).
+  - Removed the model-calling agent entirely. sereview never calls any LLM
+    and requires no API key; the host Claude Code session performs the
+    review instead.

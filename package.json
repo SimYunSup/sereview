@@ -1,0 +1,61 @@
+{
+  "name": "sereview",
+  "version": "0.1.0",
+  "description": "Deterministic code-review scaffolding for Claude Code: turn a PR diff into a review packet (parse · bundle · rule-match). The host Claude Code session is the reviewer — no API key, no LLM SDK.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Sim Yunsup",
+  "homepage": "https://github.com/SimYunSup/sereview#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SimYunSup/sereview.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SimYunSup/sereview/issues"
+  },
+  "bin": {
+    "sereview": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": "./dist/core/index.js",
+    "./skill": "./skill/SKILL.md"
+  },
+  "types": "./dist/core/index.d.ts",
+  "files": [
+    "dist",
+    "skill",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "check:no-llm-sdk": "node scripts/check-no-llm-sdk.mjs",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "code-review",
+    "claude",
+    "claude-code",
+    "diff",
+    "pull-request",
+    "security",
+    "review",
+    "static-analysis"
+  ],
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3"
+  }
+}
