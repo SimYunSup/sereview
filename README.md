@@ -124,6 +124,13 @@ changed lines, grouped by severity.
 Posting comments back to the PR is **not** part of the MVP and, when added,
 requires explicit per-review permission — sereview never comments on its own.
 
+### Other host agents (Codex, …)
+
+sereview's CLI is **agent-agnostic** — it never calls a model, it only builds the
+packet. Any agent that can run a shell command and read files can be the Tier 1
+reviewer. For **OpenAI Codex**, see [docs/codex.md](./docs/codex.md) (the same
+`ReviewResult` contract, via an `AGENTS.md` block or a one-shot prompt).
+
 ## Library API
 
 `sereview` is also a pure library (the `.` export). Everything is deterministic:
