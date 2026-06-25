@@ -11,8 +11,11 @@ export interface BundleGroup {
 }
 
 /**
- * Rough token estimate for a set of files: ~4 chars/token over hunk headers and
- * line contents, plus a small per-file overhead. Deterministic and additive
+ * Rough token estimate for a set of files: a ~3.5 chars/token heuristic over hunk
+ * headers and line contents, plus a small per-file overhead. This is NOT a real
+ * tokenizer (no tiktoken/BPE), so it can be off by tens of percent; it leans
+ * slightly conservative (code tokenizes denser than prose) so a bundle is
+ * unlikely to overflow its cap on the host side. Deterministic and additive
  * (estimate of [a, b] === estimate of [a] + estimate of [b]).
  */
 export function estimateTokens(files: BundledFile[]): number {
@@ -23,7 +26,7 @@ export function estimateTokens(files: BundledFile[]): number {
       chars += hunk.header.length + 1;
       for (const line of hunk.lines) chars += line.content.length + 2; // marker + newline
     }
-    tokens += Math.ceil(chars / 4); // round per file so the estimate stays additive
+    tokens += Math.ceil(chars / 3.5); // ~3.5 chars/token; round per file to stay additive
   }
   return tokens;
 }
