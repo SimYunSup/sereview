@@ -9,7 +9,12 @@
 /** How serious a finding is. Mirrors the rulebook's severity scale. */
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
-/** Top-level grouping for a rule / finding. */
+/**
+ * Top-level grouping for a rule / finding. The built-in starter rulebook only
+ * emits hints in the first four (it is security-leaning); `maintainability` and
+ * `style` carry no built-in rule but remain valid categories the reviewer may
+ * assign to a Finding.
+ */
 export type RuleCategory =
   | 'security'
   | 'correctness'

@@ -204,7 +204,9 @@ that release **publishes to npm with provenance** via OIDC Trusted Publishing
 
 ## License & attribution
 
-[Apache-2.0](./LICENSE). The review rule taxonomy and the deterministic pipeline
-design are derived from [Open Code Review](https://github.com/alibaba/open-code-review)
-(Apache-2.0); sereview is a TypeScript reimplementation that removes the
-model-calling agent entirely. See [`NOTICE`](./NOTICE).
+[Apache-2.0](./LICENSE). The deterministic pipeline design (diff parse · bundle ·
+rule-match) is adapted from [Open Code Review](https://github.com/alibaba/open-code-review)
+(Apache-2.0). sereview's rulebook is a small, security-leaning regex set
+re-authored from OCR's review concern areas — not a port of OCR's per-language
+rule documents — and sereview removes the model-calling agent entirely. See
+[`NOTICE`](./NOTICE).
