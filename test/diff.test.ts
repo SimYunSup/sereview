@@ -153,3 +153,18 @@ test('parseDiff: tolerates CRLF line endings', () => {
   assert.equal(b!.file.additions, 2);
   assert.equal(b!.hunks[0]!.lines[0]!.content, 'const a = 1;');
 });
+
+test('parseDiff: copy keeps the source path as previousPath', () => {
+  const d = 'diff --git a/orig.ts b/copy.ts\nsimilarity index 100%\ncopy from orig.ts\ncopy to copy.ts\n';
+  const [b] = parseDiff(d);
+  assert.equal(b!.file.path, 'copy.ts');
+  assert.equal(b!.file.previousPath, 'orig.ts');
+});
+
+test('parseDiff: a filename containing a space is not truncated', () => {
+  const d =
+    'diff --git a/my file.bin b/my file.bin\nindex 111..222 100644\nBinary files a/my file.bin and b/my file.bin differ\n';
+  const [b] = parseDiff(d);
+  assert.equal(b!.file.path, 'my file.bin');
+  assert.equal(b!.file.binary, true);
+});

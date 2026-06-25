@@ -41,9 +41,16 @@ function parseGitHeaderPaths(header: string): { old?: string; new?: string } {
   }
   const parts = rest.split(' ');
   if (parts.length === 2) return { old: stripPrefix(parts[0]!), new: stripPrefix(parts[1]!) };
-  // Paths with spaces: split on the ` b/` marker (old starts at `a/`).
-  const bIdx = rest.lastIndexOf(' b/');
-  if (rest.startsWith('a/') && bIdx > 0) return { old: rest.slice(2, bIdx), new: rest.slice(bIdx + 3) };
+  // Paths with spaces and no rename (old === new): pick the ` b/` split where the
+  // two halves are identical. (Renames with spaces are C-quoted, handled above;
+  // `lastIndexOf(' b/')` would mis-split a path that itself contains ` b/`.)
+  if (rest.startsWith('a/')) {
+    for (let idx = rest.indexOf(' b/'); idx > 0; idx = rest.indexOf(' b/', idx + 1)) {
+      if (rest.slice(2, idx) === rest.slice(idx + 3)) {
+        return { old: rest.slice(2, idx), new: rest.slice(idx + 3) };
+      }
+    }
+  }
   return {};
 }
 
@@ -74,6 +81,7 @@ export function parseDiff(diff: string): BundledFile[] {
     let newPath: string | undefined;
     let renameFrom: string | undefined;
     let renameTo: string | undefined;
+    let copied = false;
     let additions = 0;
     let deletions = 0;
     const hunks: DiffHunk[] = [];
@@ -86,8 +94,8 @@ export function parseDiff(diff: string): BundledFile[] {
       else if (l.startsWith('deleted file mode')) status = 'deleted';
       else if (l.startsWith('rename from ')) { renameFrom = l.slice(12); status = 'renamed'; }
       else if (l.startsWith('rename to ')) { renameTo = l.slice(10); status = 'renamed'; }
-      else if (l.startsWith('copy from ')) renameFrom = l.slice(10);
-      else if (l.startsWith('copy to ')) renameTo = l.slice(8);
+      else if (l.startsWith('copy from ')) { renameFrom = l.slice(10); copied = true; }
+      else if (l.startsWith('copy to ')) { renameTo = l.slice(8); copied = true; }
       else if (l.startsWith('Binary files') || l.startsWith('GIT binary patch')) binary = true;
       else if (l.startsWith('--- ')) oldPath = stripPrefix(unquote(l.slice(4)));
       else if (l.startsWith('+++ ')) newPath = stripPrefix(unquote(l.slice(4)));
@@ -153,6 +161,9 @@ export function parseDiff(diff: string): BundledFile[] {
     }
 
     if (status === 'renamed') {
+      previousPath = renameFrom ?? fromHeader.old;
+    } else if (copied) {
+      // A copy keeps its modified/added status but still has a source path.
       previousPath = renameFrom ?? fromHeader.old;
     } else if (liveOld && liveNew && liveOld !== liveNew) {
       // Rename detected only via differing ---/+++ paths (no rename header).

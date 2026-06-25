@@ -77,6 +77,11 @@ function runPacket(args: CliArgs): void {
     skip: defaultSkip,
     ...(args.maxBundleTokens !== undefined ? { maxBundleTokens: args.maxBundleTokens } : {}),
   });
+  if (packet.stats.files === 0 && diff.trim() !== '') {
+    process.stderr.write(
+      'sereview: warning — input was non-empty but contained no `diff --git` headers; produced an empty packet.\n',
+    );
+  }
   process.stdout.write(serializePacket(packet) + '\n');
 }
 
