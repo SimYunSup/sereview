@@ -8,18 +8,29 @@ export interface PrRef {
 /**
  * Parse a PR reference: a GitHub URL (`https://github.com/owner/repo/pull/123`,
  * with or without scheme / trailing path) or the `owner/repo#number` shorthand.
- * Throws if neither form matches.
+ * Owner/repo must start with an alphanumeric and contain only `[A-Za-z0-9._-]`
+ * (so a `-`/`=`-leading value can't be smuggled into `gh` as a flag), and the PR
+ * number must be a safe positive integer. Throws if any part is invalid.
  */
 export function parsePrRef(input: string): PrRef {
   const s = input.trim();
 
-  const short = /^([^/\s]+)\/([^/\s#]+)#(\d+)$/.exec(s);
-  if (short) return { owner: short[1]!, repo: short[2]!, number: Number(short[3]) };
+  const short = /^([A-Za-z0-9][\w.-]*)\/([A-Za-z0-9][\w.-]*)#(\d+)$/.exec(s);
+  if (short) return { owner: short[1]!, repo: short[2]!, number: prNumber(short[3]!, input) };
 
-  const url = /(?:^|\/\/)[^/]*github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/.exec(s);
-  if (url) return { owner: url[1]!, repo: url[2]!, number: Number(url[3]) };
+  const url = /(?:^|\/\/)[^/]*github\.com\/([A-Za-z0-9][\w.-]*)\/([A-Za-z0-9][\w.-]*)\/pull\/(\d+)/.exec(s);
+  if (url) return { owner: url[1]!, repo: url[2]!, number: prNumber(url[3]!, input) };
 
   throw new Error(`Not a recognizable PR reference: "${input}". Use a PR URL or owner/repo#number.`);
+}
+
+/** Parse a PR number, rejecting non-positive or unsafe-integer (overflow) values. */
+function prNumber(digits: string, input: string): number {
+  const n = Number(digits);
+  if (!Number.isSafeInteger(n) || n < 1) {
+    throw new Error(`PR number out of range in "${input}".`);
+  }
+  return n;
 }
 
 /** Parsed `sereview` command line. */
@@ -53,11 +64,13 @@ export function parseCliArgs(argv: string[]): CliArgs {
       if (diffPath === undefined) throw new Error('--diff requires a path, or "-" for stdin.');
     } else if (arg === '--max-bundle-tokens') {
       const v = rest[++i];
-      const n = Number(v);
-      if (v === undefined || !Number.isFinite(n) || n <= 0) {
-        throw new Error(`--max-bundle-tokens needs a positive number (got "${v ?? ''}").`);
+      const trimmed = v?.trim();
+      // Positive integer only — `Number()` would accept hex (0x10), fractions
+      // (0.5, which makes every file its own bundle), and other junk.
+      if (trimmed === undefined || !/^\d+$/.test(trimmed) || Number(trimmed) < 1) {
+        throw new Error(`--max-bundle-tokens needs a positive integer (got "${v ?? ''}").`);
       }
-      maxBundleTokens = n;
+      maxBundleTokens = Number(trimmed);
     } else if (arg.startsWith('-')) {
       throw new Error(`Unknown option: "${arg}".`);
     } else if (pr === undefined) {

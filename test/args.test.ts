@@ -68,3 +68,19 @@ test('parseCliArgs: unknown command throws', () => {
 test('parseCliArgs: non-numeric --max-bundle-tokens throws', () => {
   assert.throws(() => parseCliArgs(['packet', 'o/r#1', '--max-bundle-tokens', 'abc']));
 });
+
+test('parsePrRef: a "-"/"="-leading owner is rejected (no flag smuggling into gh)', () => {
+  assert.throws(() => parsePrRef('-X/repo#1'));
+  assert.throws(() => parsePrRef('https://github.com/--upload-pack=x/r/pull/1'));
+});
+
+test('parsePrRef: an overflowing PR number is rejected', () => {
+  assert.throws(() => parsePrRef('o/r#999999999999999999999'));
+});
+
+test('parseCliArgs: --max-bundle-tokens rejects hex, fractions, and zero', () => {
+  for (const v of ['0x10', '0.5', '0', '-5', '1e3', ' ']) {
+    assert.throws(() => parseCliArgs(['packet', 'o/r#1', '--max-bundle-tokens', v]), new RegExp('positive integer'));
+  }
+  assert.equal(parseCliArgs(['packet', 'o/r#1', '--max-bundle-tokens', ' 4096 ']).maxBundleTokens, 4096);
+});
