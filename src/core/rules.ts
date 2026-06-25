@@ -181,6 +181,11 @@ function toMatchedRule(r: RuleDefinition): MatchedRule {
  * plain {@link MatchedRule}s, without the matcher fn) in rulebook order. Pure.
  */
 export function matchRules(files: BundledFile[], rulebook: RuleDefinition[] = RULEBOOK): MatchedRule[] {
-  const ctx = buildContext(files);
-  return rulebook.filter((rule) => rule.matches(ctx)).map(toMatchedRule);
+  // Match each file independently so a matcher that needs several signals (e.g.
+  // n+1 = a loop AND a query) only fires when they co-occur in the SAME file —
+  // not when a loop in one bundled file and a query in another are joined into
+  // one text. A rule is attached if it matches any single file. Rulebook order
+  // and determinism are preserved.
+  const contexts = files.map((bf) => buildContext([bf]));
+  return rulebook.filter((rule) => contexts.some((ctx) => rule.matches(ctx))).map(toMatchedRule);
 }

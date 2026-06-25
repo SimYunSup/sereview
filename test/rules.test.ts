@@ -60,6 +60,14 @@ test('matchRules: query inside a loop → n-plus-1', () => {
   assert.ok(ids(fs).includes('n-plus-1'));
 });
 
+test('matchRules: n+1 signals split across bundled files do NOT cross-trigger', () => {
+  const fs = [
+    added('a.ts', 'for (const u of users) { doSomething(u); }'), // loop, no query
+    added('b.ts', 'const all = await prisma.user.findMany();'), // query, no loop
+  ];
+  assert.ok(!ids(fs).includes('n-plus-1'), 'a loop in one file + a query in another must not match per-file');
+});
+
 test('matchRules: benign arithmetic matches no security/perf rule', () => {
   const matched = ids([added('src/math.ts', 'const sum = a + b;', 'return sum;')]);
   for (const id of ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'n-plus-1']) {
