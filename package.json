@@ -1,6 +1,6 @@
 {
   "name": "sereview",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deterministic code-review scaffolding for Claude Code: turn a PR diff into a review packet (parse · bundle · rule-match). The host Claude Code session is the reviewer — no API key, no LLM SDK.",
   "type": "module",
   "license": "Apache-2.0",
