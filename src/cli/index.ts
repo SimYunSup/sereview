@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { buildPacket, serializePacket } from '../core/index.ts';
+import { buildPacket, defaultSkip, serializePacket } from '../core/index.ts';
 import type { ReviewSource } from '../core/index.ts';
 import { parseCliArgs, parsePrRef } from './args.ts';
 import type { CliArgs } from './args.ts';
@@ -74,6 +74,7 @@ function runPacket(args: CliArgs): void {
   const packet = buildPacket({
     diff,
     source,
+    skip: defaultSkip,
     ...(args.maxBundleTokens !== undefined ? { maxBundleTokens: args.maxBundleTokens } : {}),
   });
   process.stdout.write(serializePacket(packet) + '\n');

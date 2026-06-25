@@ -54,4 +54,5 @@ export function serializePacket(packet: ReviewPacket): string {
 export { parseDiff, detectLanguage } from './diff.ts';
 export { estimateTokens, DEFAULT_MAX_BUNDLE_TOKENS } from './bundle.ts';
 export { RULEBOOK_VERSION } from './rules.ts';
+export { defaultSkip } from './skip.ts';
 export type * from './types.ts';
