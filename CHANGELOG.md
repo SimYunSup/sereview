@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`github-actions-security` rule (rulebook v2):** Detects `pull_request_target`
+  misuse, secrets interpolated in `run:` blocks, user-controlled expressions
+  enabling script injection, and third-party actions pinned to mutable tags rather
+  than a commit SHA. Derived from the GitHub Actions rules added to upstream
+  open-code-review on 2026-06-22.
+- **Upstream watch** (`.github/workflows/upstream-watch.yml`): Weekly scheduled
+  job that detects new releases of `alibaba/open-code-review`, opens a GitHub
+  issue with a review checklist, and bumps `.github/upstream-versions.json`.
+
 ## [0.1.0] - 2026-06-25
 
 Initial release.
