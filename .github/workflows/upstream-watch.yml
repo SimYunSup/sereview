@@ -45,32 +45,37 @@ jobs:
           RELEASE_NOTES=$(gh release view "$LATEST" \
             --repo alibaba/open-code-review --json body --jq '.body')
 
+          BODY_FILE=$(mktemp)
+          cat > "$BODY_FILE" <<EOF
+          ## alibaba/open-code-review $LATEST
+
+          sereview derives its **review rule taxonomy** and **deterministic pipeline
+          design** from [alibaba/open-code-review](https://github.com/alibaba/open-code-review)
+          (see \`NOTICE\`). A new release was detected — check whether any changes affect
+          the derived components.
+
+          **Tracked version:** $CURRENT → $LATEST
+          **Compare:** https://github.com/alibaba/open-code-review/compare/$CURRENT...$LATEST
+
+          ### Release notes
+
+          $RELEASE_NOTES
+
+          ---
+
+          ### Checklist
+
+          - [ ] Review rule taxonomy changes (new / modified rules in \`internal/config/rules/\`)
+          - [ ] Review pipeline / diff-parsing changes (\`internal/diff/\`, \`internal/scan/\`)
+          - [ ] Update \`src/core/rules.ts\` and bump \`RULEBOOK_VERSION\` if rules changed
+          - [ ] Update \`skill/SKILL.md\` if the review workflow improved
+          - [ ] Update \`NOTICE\` attribution if the derived scope changed
+          - [ ] Update \`.github/upstream-versions.json\` once the review is done (or close this issue)
+          EOF
+
           gh issue create \
             --title "⬆️ Upstream: alibaba/open-code-review $LATEST" \
-            --body "## alibaba/open-code-review $LATEST
-
-sereview derives its **review rule taxonomy** and **deterministic pipeline
-design** from [alibaba/open-code-review](https://github.com/alibaba/open-code-review)
-(see \`NOTICE\`). A new release was detected — check whether any changes affect
-the derived components.
-
-**Tracked version:** $CURRENT → $LATEST
-**Compare:** https://github.com/alibaba/open-code-review/compare/$CURRENT...$LATEST
-
-### Release notes
-
-$RELEASE_NOTES
-
----
-
-### Checklist
-
-- [ ] Review rule taxonomy changes (new / modified rules in \`internal/config/rules/\`)
-- [ ] Review pipeline / diff-parsing changes (\`internal/diff/\`, \`internal/scan/\`)
-- [ ] Update \`src/core/rules.ts\` and bump \`RULEBOOK_VERSION\` if rules changed
-- [ ] Update \`skill/SKILL.md\` if the review workflow improved
-- [ ] Update \`NOTICE\` attribution if the derived scope changed
-- [ ] Update \`.github/upstream-versions.json\` once the review is done (or close this issue)"
+            --body-file "$BODY_FILE"
 
           jq --arg v "$LATEST" '."alibaba/open-code-review" = $v' \
             .github/upstream-versions.json > tmp.json
