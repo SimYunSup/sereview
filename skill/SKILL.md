@@ -59,9 +59,9 @@ already run. No separate API key is involved.
 ## Rulebook (security-leaning starter set)
 
 `sql-injection` · `xss` · `ssrf` · `path-traversal` · `secret-exposure` ·
-`authz` · `npe` · `race` · `n-plus-1`. Each carries `guidance` in the packet
-describing what to check. Findings are not limited to these — they focus
-attention, they don't cap it.
+`authz` · `npe` · `race` · `n-plus-1` · `github-actions-security`. Each carries
+`guidance` in the packet describing what to check. Findings are not limited to
+these — they focus attention, they don't cap it.
 
 ## Output: `ReviewResult`
 

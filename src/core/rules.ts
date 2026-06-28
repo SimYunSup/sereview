@@ -1,7 +1,7 @@
 import type { BundledFile, MatchedRule } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-1 (2026-06-25)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-2 (2026-06-28)';
 
 /** Pre-computed view of a diff used by rule matchers (added lines only). */
 interface RuleContext {
@@ -162,6 +162,23 @@ export const RULEBOOK: RuleDefinition[] = [
       /prisma\.|\.findone|\.findmany|\.findunique|\.findall|repository\.|\.query\(|await\s+db\.|\.aggregate\(|knex\(|sequelize\.|\bselect\s+.+\s+from\b|entitymanager|session\.query/i.test(
         c.addedText,
       ),
+  },
+  {
+    id: 'github-actions-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'GitHub Actions security issue',
+    guidance:
+      'Check for: (1) pull_request_target with checkout of PR head — runs untrusted code with write permissions; (2) secrets interpolated in run: blocks (echo ${{ secrets.X }}) — must be passed via env: instead; (3) user-controlled expressions (${{ github.event.issue.title }}) used directly in run: — enables script injection; (4) third-party actions pinned to a mutable tag rather than a full commit SHA — tags can be hijacked.',
+    appliesTo: ['ci', 'yaml'],
+    matches: (c) =>
+      c.paths.some((p) => /\.github\/workflows\//i.test(p)) &&
+      (/pull_request_target/i.test(c.addedText) ||
+        /\$\{\{\s*secrets\.[^}]+\}\}/i.test(c.addedText) ||
+        /\$\{\{\s*github\.event\.(issue|pull_request|comment|discussion)\.(title|body|name)\s*\}\}/i.test(
+          c.addedText,
+        ) ||
+        /uses:\s+(?!actions\/)[\w/-]+@(?![\da-f]{40})[^#\s\n]+/i.test(c.addedText)),
   },
 ];
 
