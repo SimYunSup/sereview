@@ -92,14 +92,15 @@ sereview --version
       ],
       "matchedRules": [
         { "id": "sql-injection", "category": "security", "severityHint": "high",
-          "title": "SQL injection via string-built query", "guidance": "…", "appliesTo": ["…"] }
+          "title": "SQL injection via string-built query", "guidance": "…",
+          "appliesTo": ["…"], "matchedPaths": ["src/db.ts"] }
       ],
       "tokenEstimate": 73
     }
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-1 (2026-06-25)"
+  "rulebookVersion": "sereview-rulebook-4 (2026-07-15)"
 }
 ```
 
@@ -140,14 +141,15 @@ const packet = buildPacket({
   source: { kind: "local-diff", ref: "HEAD" },
   maxBundleTokens: 8000,                  // 선택(기본 8000)
   // skip: (f) => f.path.endsWith(".lock") ? "lockfile" : null,  // 선택
+  // rulebook: [ /* 커스텀 RuleDefinition[] */ ],                 // 선택: 매칭에 쓸 룰셋 교체
 });
 console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 ```
 
 이 밖의 export: `parseDiff`, `detectLanguage`, `estimateTokens`,
-`DEFAULT_MAX_BUNDLE_TOKENS`, `RULEBOOK_VERSION`, 그리고 모든 타입
-(`ReviewPacket`, `ReviewBundle`, `MatchedRule`, `Finding`, `ReviewResult`, …).
-자세한 건 [`src/core/types.ts`](./src/core/types.ts) 참고.
+`DEFAULT_MAX_BUNDLE_TOKENS`, `RULEBOOK_VERSION`, `RULEBOOK`, `matchRules`, 그리고
+모든 타입 (`ReviewPacket`, `ReviewBundle`, `MatchedRule`, `RuleDefinition`,
+`Finding`, `ReviewResult`, …). 자세한 건 [`src/core/types.ts`](./src/core/types.ts) 참고.
 
 ## 룰셋
 
@@ -164,8 +166,15 @@ console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 | `npe` | correctness | medium |
 | `race` | concurrency | medium |
 | `n-plus-1` | performance | medium |
+| `github-actions-security` | security | high |
 
 심각도 단계: `critical · high · medium · low · info`.
+
+각 룰은 **언어 게이트**를 거친다: 파일에서 감지된 언어가 그 룰이 다루는
+언어(`appliesTo`)일 때만 발동한다. 태그로만 범위를 정한 룰(예: `any` 태그의
+`secret-exposure`)은 언어와 무관하게 어떤 파일에서도 발동하고, 언어를 감지할 수 없는
+파일에서는 이런 언어 무관 룰만 발동한다. 매칭된 룰에는 발동한 번들 속 파일 경로가
+`matchedPaths`로 함께 담긴다.
 
 ## 아키텍처 (Open Code Review에서 가져옴)
 

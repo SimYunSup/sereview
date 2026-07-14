@@ -8,6 +8,45 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Astro support in the rulebook (rulebook v3):** the `xss` rule recognizes
+  Astro's `set:html` sink and `.astro` maps to the `astro` language. Derived from
+  upstream open-code-review's Astro rules (v1.6.5…v1.7.7 review).
+- **Rule-engine surface exports:** `RULEBOOK`, `matchRules`, `RuleDefinition`,
+  and `RuleContext`, plus a `rulebook` option on `buildPacket` to swap the
+  matched rule set (the existing `rules` static override still wins).
+- **`MatchedRule.matchedPaths`:** the changed files a rule fired on, in diff
+  order. Optional, so the packet stays `schemaVersion` 1.
+- **Golden-packet regression test:** freezes the serialized packet for a
+  representative diff; regenerate with `UPDATE_GOLDEN=1 pnpm test`.
+
+### Changed
+
+- **Language gating (rulebook v4):** a rule now fires on a file only when the
+  file's detected language is one it covers (`appliesTo`). Tag-only rules (e.g.
+  `secret-exposure`) stay language-agnostic; unknown-language files trigger only
+  those. So `eval()` in a `.py` file no longer flags `xss`, and SQL in a `.md`
+  file no longer flags `sql-injection`.
+- **Workflow hardening:** third-party actions (`pnpm/action-setup`,
+  `fregante/setup-git-user`) are pinned to commit SHAs; the publish job pins npm
+  to the `11` major; `tagging` runs only for `release/*` PRs from this repo.
+- **Upstream watch** updates an already-open tracking issue instead of opening a
+  duplicate, preserving the oldest un-reviewed range.
+
+### Fixed
+
+- **Diff parser:** a whitespace-stripped empty context line no longer truncates
+  the rest of a hunk.
+
+### Docs
+
+- README / README.ko rule table includes `github-actions-security`, the sample
+  packet shows the current rulebook version, and `skill/SKILL.md` verifies
+  `schemaVersion` and pins the CLI to `sereview@^0.1`.
+
+## [0.1.2] - 2026-06-28
+
+### Added
+
 - **`github-actions-security` rule (rulebook v2):** Detects `pull_request_target`
   misuse, secrets interpolated in `run:` blocks, user-controlled expressions
   enabling script injection, and third-party actions pinned to mutable tags rather
@@ -16,6 +55,11 @@ to [Semantic Versioning](https://semver.org/).
 - **Upstream watch** (`.github/workflows/upstream-watch.yml`): Weekly scheduled
   job that detects new releases of `alibaba/open-code-review`, opens a GitHub
   issue with a review checklist, and bumps `.github/upstream-versions.json`.
+
+## [0.1.1] - 2026-06-25
+
+First release published to npm via OIDC Trusted Publishing. No user-facing code
+changes over 0.1.0.
 
 ## [0.1.0] - 2026-06-25
 
@@ -48,5 +92,7 @@ Initial release.
   the model-calling agent is removed and replaced by the host Claude Code session.
   See `NOTICE`.
 
-[Unreleased]: https://github.com/SimYunSup/sereview/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/SimYunSup/sereview/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/SimYunSup/sereview/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/SimYunSup/sereview/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/SimYunSup/sereview/releases/tag/v0.1.0
