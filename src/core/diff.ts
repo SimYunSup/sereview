@@ -9,7 +9,7 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
   m: 'objective-c', mm: 'objective-c',
   sql: 'sql', sh: 'shell', bash: 'shell', zsh: 'shell',
-  html: 'html', css: 'css', scss: 'scss', less: 'less', vue: 'vue', svelte: 'svelte',
+  html: 'html', css: 'css', scss: 'scss', less: 'less', vue: 'vue', svelte: 'svelte', astro: 'astro',
   json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', md: 'markdown',
 };
 

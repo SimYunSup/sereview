@@ -1,7 +1,7 @@
 import type { BundledFile, MatchedRule } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-2 (2026-06-28)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-3 (2026-07-14)';
 
 /** Pre-computed view of a diff used by rule matchers (added lines only). */
 interface RuleContext {
@@ -57,10 +57,10 @@ export const RULEBOOK: RuleDefinition[] = [
     severityHint: 'high',
     title: 'Possible XSS via an unescaped HTML sink',
     guidance:
-      'Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML) or eval. Confirm the value is escaped/sanitized, or rendered as text rather than HTML.',
-    appliesTo: ['frontend', 'javascript', 'typescript', 'html', 'vue', 'svelte'],
+      'Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Confirm the value is escaped/sanitized, or rendered as text rather than HTML.',
+    appliesTo: ['frontend', 'javascript', 'typescript', 'html', 'vue', 'svelte', 'astro'],
     matches: (c) =>
-      /\b(innerhtml|outerhtml|dangerouslysetinnerhtml|insertadjacenthtml|document\.write|v-html)\b|\beval\s*\(/i.test(
+      /\b(innerhtml|outerhtml|dangerouslysetinnerhtml|insertadjacenthtml|document\.write|v-html)\b|\bset:html\b|\beval\s*\(/i.test(
         c.addedText,
       ),
   },
