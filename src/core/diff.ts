@@ -13,6 +13,9 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', md: 'markdown',
 };
 
+/** The set of language ids {@link detectLanguage} can produce. */
+export const KNOWN_LANGUAGES: ReadonlySet<string> = new Set(Object.values(LANGUAGE_BY_EXT));
+
 /** Derive a language id from a path's extension (dotfiles yield `undefined`). */
 export function detectLanguage(path: string): string | undefined {
   const base = path.slice(path.lastIndexOf('/') + 1);
@@ -113,6 +116,11 @@ export function parseDiff(diff: string): BundledFile[] {
       const hunkLines: DiffLine[] = [];
       let oldLine = oldStart;
       let newLine = newStart;
+      // Lines still owed to this hunk per its header counts. Used to recognize an
+      // empty context line: some tools strip the leading space from a blank
+      // context line, leaving "", which must not be mistaken for the hunk's end.
+      let oldRemaining = m[2] === undefined ? 1 : Number(m[2]);
+      let newRemaining = m[4] === undefined ? 1 : Number(m[4]);
       while (i < n) {
         const hl = lines[i]!;
         if (hl.startsWith('@@ ') || hl.startsWith('diff --git ')) break;
@@ -124,15 +132,26 @@ export function parseDiff(diff: string): BundledFile[] {
         if (marker === '+') {
           hunkLines.push({ type: 'add', newLine, content: hl.slice(1) });
           newLine++;
+          newRemaining--;
           additions++;
         } else if (marker === '-') {
           hunkLines.push({ type: 'del', oldLine, content: hl.slice(1) });
           oldLine++;
+          oldRemaining--;
           deletions++;
         } else if (marker === ' ') {
           hunkLines.push({ type: 'context', newLine, oldLine, content: hl.slice(1) });
           newLine++;
           oldLine++;
+          oldRemaining--;
+          newRemaining--;
+        } else if (hl === '' && (oldRemaining > 0 || newRemaining > 0)) {
+          // A whitespace-stripped empty context line, still inside the hunk.
+          hunkLines.push({ type: 'context', newLine, oldLine, content: '' });
+          newLine++;
+          oldLine++;
+          oldRemaining--;
+          newRemaining--;
         } else {
           break; // blank/unexpected line ends the hunk
         }

@@ -90,6 +90,38 @@ test('parseDiff: hunk header + line numbering (no undefined keys)', () => {
   assert.deepEqual(h.lines[4], { type: 'context', newLine: 4, oldLine: 3, content: 'const d = 5;' });
 });
 
+test('parseDiff: an empty (whitespace-stripped) context line does not truncate the hunk', () => {
+  // Some tools strip the trailing whitespace from a blank context line, leaving
+  // "" instead of " ". The parser must treat it as an empty context line and
+  // keep the rest of the hunk (the add + trailing context after the blank line).
+  const STRIPPED = [
+    'diff --git a/f.py b/f.py',
+    'index 1..2 100644',
+    '--- a/f.py',
+    '+++ b/f.py',
+    '@@ -1,3 +1,4 @@',
+    ' import os',
+    '', // blank context line with its leading space stripped
+    '+x = 1',
+    ' print(os)',
+    '',
+  ].join('\n');
+
+  const [b] = parseDiff(STRIPPED);
+  const h = b!.hunks[0]!;
+  assert.deepEqual(
+    h.lines.map((l) => ({ type: l.type, content: l.content })),
+    [
+      { type: 'context', content: 'import os' },
+      { type: 'context', content: '' },
+      { type: 'add', content: 'x = 1' },
+      { type: 'context', content: 'print(os)' },
+    ],
+  );
+  assert.equal(b!.file.additions, 1);
+  assert.equal(h.lines[3]!.newLine, 4); // line numbering continues past the blank line
+});
+
 test('parseDiff: added file (/dev/null source)', () => {
   const [b] = parseDiff(ADDED);
   assert.equal(b!.file.status, 'added');
