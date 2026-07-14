@@ -29,8 +29,12 @@ to [Semantic Versioning](https://semver.org/).
 - **Workflow hardening:** third-party actions (`pnpm/action-setup`,
   `fregante/setup-git-user`) are pinned to commit SHAs; the publish job pins npm
   to the `11` major; `tagging` runs only for `release/*` PRs from this repo.
-- **Upstream watch** updates an already-open tracking issue instead of opening a
-  duplicate, preserving the oldest un-reviewed range.
+- **Upstream watch** now updates an already-open tracking issue instead of
+  opening a duplicate — it retitles to the latest version and preserves the
+  oldest un-reviewed "from" version so the compare link covers the whole range,
+  appending the new release notes. Also corrects the stale checklist wording
+  (the tracked version is bumped when the issue opens) and does a
+  `git pull --rebase` before pushing. (from the open-code-review v1.6.5…v1.7.7 sync)
 
 ### Fixed
 
