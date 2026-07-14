@@ -1,21 +1,10 @@
-import type { BundledFile, MatchedRule } from './types.ts';
+import { KNOWN_LANGUAGES } from './diff.ts';
+import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './types.ts';
+
+export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-3 (2026-07-14)';
-
-/** Pre-computed view of a diff used by rule matchers (added lines only). */
-interface RuleContext {
-  /** All added-line contents joined by "\n". */
-  addedText: string;
-  paths: string[];
-  languages: Set<string>;
-}
-
-/** A rulebook entry: the public {@link MatchedRule} plus a deterministic matcher. */
-export interface RuleDefinition extends MatchedRule {
-  /** Heuristic over added code — a HINT for the reviewer, never a verdict. */
-  matches(ctx: RuleContext): boolean;
-}
+export const RULEBOOK_VERSION = 'sereview-rulebook-4 (2026-07-15)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -182,7 +171,7 @@ export const RULEBOOK: RuleDefinition[] = [
   },
 ];
 
-function toMatchedRule(r: RuleDefinition): MatchedRule {
+function toMatchedRule(r: RuleDefinition, matchedPaths: string[]): MatchedRule {
   return {
     id: r.id,
     category: r.category,
@@ -190,19 +179,54 @@ function toMatchedRule(r: RuleDefinition): MatchedRule {
     title: r.title,
     guidance: r.guidance,
     appliesTo: r.appliesTo,
+    matchedPaths,
   };
 }
 
 /**
+ * The subset of a rule's {@link RuleDefinition.appliesTo} that are real language
+ * ids (machine-checked). Entries that are not language ids (e.g. `any`,
+ * `backend`, `ci`) are display-only tags and do not gate matching.
+ */
+function languageGate(rule: RuleDefinition): string[] {
+  return rule.appliesTo.filter((a) => KNOWN_LANGUAGES.has(a));
+}
+
+/**
+ * Whether `rule` applies to a single-file context: its heuristic must match AND
+ * the file's language must be in the rule's language gate. Rules with no
+ * language ids in `appliesTo` (tag-only, e.g. `secret-exposure`) are
+ * language-agnostic and fire on any file. A file whose language is unknown/
+ * undetected only triggers language-agnostic rules.
+ */
+function ruleAppliesToFile(rule: RuleDefinition, gate: string[], ctx: RuleContext): boolean {
+  if (!rule.matches(ctx)) return false;
+  if (gate.length === 0) return true;
+  for (const lang of ctx.languages) if (gate.includes(lang)) return true;
+  return false;
+}
+
+/**
  * Run the rulebook over a set of changed files and return the matched rules (as
- * plain {@link MatchedRule}s, without the matcher fn) in rulebook order. Pure.
+ * plain {@link MatchedRule}s, without the matcher fn) in rulebook order, each
+ * carrying the diff-ordered `matchedPaths` it fired on. Pure and deterministic.
  */
 export function matchRules(files: BundledFile[], rulebook: RuleDefinition[] = RULEBOOK): MatchedRule[] {
   // Match each file independently so a matcher that needs several signals (e.g.
   // n+1 = a loop AND a query) only fires when they co-occur in the SAME file —
   // not when a loop in one bundled file and a query in another are joined into
-  // one text. A rule is attached if it matches any single file. Rulebook order
-  // and determinism are preserved.
+  // one text. A rule is attached if it matches any single file, and language
+  // gating (appliesTo) is enforced per file. Rulebook order (then diff order for
+  // matchedPaths) and determinism are preserved.
   const contexts = files.map((bf) => buildContext([bf]));
-  return rulebook.filter((rule) => contexts.some((ctx) => rule.matches(ctx))).map(toMatchedRule);
+  const matched: MatchedRule[] = [];
+  for (const rule of rulebook) {
+    const gate = languageGate(rule);
+    const matchedPaths: string[] = [];
+    contexts.forEach((ctx, idx) => {
+      if (ruleAppliesToFile(rule, gate, ctx)) matchedPaths.push(files[idx]!.file.path);
+    });
+    if (matchedPaths.length > 0) matched.push(toMatchedRule(rule, matchedPaths));
+  }
+  return matched;
 }

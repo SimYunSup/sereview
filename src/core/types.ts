@@ -77,6 +77,29 @@ export interface MatchedRule {
   guidance: string;
   /** Human-readable scope tags (languages / path patterns) the rule covers. */
   appliesTo: string[];
+  /**
+   * The changed-file paths this rule actually matched, in diff order. Present
+   * on rules emitted by the built-in matcher; omitted on caller-supplied static
+   * rules (the `rules` override). Optional, so adding it keeps `schemaVersion` 1.
+   */
+  matchedPaths?: string[];
+}
+
+/**
+ * Pre-computed view of a single file's diff that a rule matcher reads (added
+ * lines only). Exposed so callers can author their own {@link RuleDefinition}s.
+ */
+export interface RuleContext {
+  /** All added-line contents joined by "\n". */
+  addedText: string;
+  paths: string[];
+  languages: Set<string>;
+}
+
+/** A rulebook entry: the public {@link MatchedRule} plus a deterministic matcher. */
+export interface RuleDefinition extends MatchedRule {
+  /** Heuristic over added code — a HINT for the reviewer, never a verdict. */
+  matches(ctx: RuleContext): boolean;
 }
 
 /** A changed file together with its parsed hunks. */
@@ -154,8 +177,18 @@ export interface BuildPacketOptions {
   source: ReviewSource;
   /** Soft cap on a bundle's estimated tokens before a new bundle is started. */
   maxBundleTokens?: number;
-  /** Override the matched-rule set (defaults to the built-in rulebook). */
+  /**
+   * Stamp this exact set of matched rules on every bundle, bypassing the matcher
+   * entirely. Takes precedence over {@link rulebook}. Use it when you have
+   * already decided the rules; use `rulebook` to swap the *matched* rule set.
+   */
   rules?: MatchedRule[];
+  /**
+   * Replace the built-in {@link RULEBOOK} the matcher runs (per bundle) with a
+   * custom rulebook. Ignored when {@link rules} is set. Defaults to the built-in
+   * rulebook.
+   */
+  rulebook?: RuleDefinition[];
   /**
    * Per-file skip predicate: return a reason string to exclude the file
    * (recorded in `packet.skipped`), or null/undefined to keep it. Applied on top

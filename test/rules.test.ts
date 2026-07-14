@@ -60,6 +60,41 @@ test('matchRules: Astro set:html directive → xss', () => {
   assert.ok(xss!.appliesTo.includes('astro'), 'xss rule should advertise astro applicability');
 });
 
+test('matchRules: language gating — eval() in a .py file does NOT fire xss', () => {
+  // eval( matches the xss heuristic, but xss.appliesTo has no `python` id, so
+  // the language gate must suppress it on a Python file.
+  assert.ok(!ids([added('src/app.py', 'result = eval(user_input)')]).includes('xss'));
+});
+
+test('matchRules: language gating — SQL in a .md file does NOT fire sql-injection', () => {
+  const fs = [added('docs/guide.md', 'Example query: "SELECT * FROM users WHERE id = " + id')];
+  assert.ok(!ids(fs).includes('sql-injection'));
+});
+
+test('matchRules: language gating — positive cases in a matching language still fire', () => {
+  assert.ok(ids([added('src/app.ts', 'const x = eval(userInput);')]).includes('xss'));
+  assert.ok(
+    ids([added('db.go', 'q := "SELECT * FROM users WHERE id = " + userId')]).includes('sql-injection'),
+  );
+});
+
+test('matchRules: language gating — tag-only rules fire on unknown-language files', () => {
+  // secret-exposure.appliesTo is ['any'] (no language id) → language-agnostic.
+  const fs = [added('Dockerfile', 'ENV API_KEY="sk-abc123def456ghijkl"')];
+  assert.ok(ids(fs).includes('secret-exposure'));
+});
+
+test('matchRules: matchedPaths lists the files a rule fired on, in diff order', () => {
+  const fs = [
+    added('web/a.ts', 'el.innerHTML = x;'),
+    added('web/clean.ts', 'const y = 1 + 2;'),
+    added('web/b.ts', 'node.innerHTML = y;'),
+  ];
+  const xss = matchRules(fs).find((r) => r.id === 'xss');
+  assert.ok(xss, 'xss should match');
+  assert.deepEqual(xss!.matchedPaths, ['web/a.ts', 'web/b.ts']);
+});
+
 test('matchRules: query inside a loop → n-plus-1', () => {
   const fs = [
     added(

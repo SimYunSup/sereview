@@ -25,7 +25,7 @@ export function buildPacket(opts: BuildPacketOptions): ReviewPacket {
   const bundles: ReviewBundle[] = bundleFiles(reviewable, maxBundleTokens).map((g) => ({
     id: g.id,
     files: g.files,
-    matchedRules: opts.rules ? [...opts.rules] : matchRules(g.files),
+    matchedRules: opts.rules ? [...opts.rules] : matchRules(g.files, opts.rulebook),
     tokenEstimate: g.tokenEstimate,
   }));
 
@@ -53,6 +53,6 @@ export function serializePacket(packet: ReviewPacket): string {
 
 export { parseDiff, detectLanguage } from './diff.ts';
 export { estimateTokens, DEFAULT_MAX_BUNDLE_TOKENS } from './bundle.ts';
-export { RULEBOOK_VERSION } from './rules.ts';
+export { RULEBOOK, RULEBOOK_VERSION, matchRules } from './rules.ts';
 export { defaultSkip } from './skip.ts';
 export type * from './types.ts';
