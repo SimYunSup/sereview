@@ -35,7 +35,7 @@ jobs:
             echo "new=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Open issue and bump tracked version
+      - name: Open or update tracking issue, bump tracked version
         if: steps.check.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,8 +45,37 @@ jobs:
           RELEASE_NOTES=$(gh release view "$LATEST" \
             --repo alibaba/open-code-review --json body --jq '.body')
 
+          TITLE="⬆️ Upstream: alibaba/open-code-review $LATEST"
           BODY_FILE=$(mktemp)
-          cat > "$BODY_FILE" <<EOF
+
+          # Reuse an already-open tracking issue instead of stacking duplicates
+          # (e.g. when a new release ships before the previous one was reviewed).
+          EXISTING_NUM=$(gh issue list --state open \
+            --search '"⬆️ Upstream: alibaba/open-code-review" in:title' \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING_NUM" ]; then
+            gh issue view "$EXISTING_NUM" --json body --jq '.body' > "$BODY_FILE"
+
+            # Keep the oldest "from" version so the compare link still covers the
+            # whole un-reviewed range; read it back from the existing compare link.
+            FROM=$(grep -oE 'compare/v[0-9][0-9.]*\.\.\.' "$BODY_FILE" \
+              | head -1 | sed -E 's|compare/(v[0-9.]*)\.\.\.|\1|')
+            FROM=${FROM:-$CURRENT}
+
+            sed -i -E "s|^## alibaba/open-code-review .*|## alibaba/open-code-review $LATEST|" "$BODY_FILE"
+            sed -i -E "s|^\*\*Tracked version:\*\* .*|**Tracked version:** $FROM → $LATEST|" "$BODY_FILE"
+            sed -i -E "s|^\*\*Compare:\*\* .*|**Compare:** https://github.com/alibaba/open-code-review/compare/$FROM...$LATEST|" "$BODY_FILE"
+            sed -i -E "s|^- \[ \] (Update [^ ]*upstream-versions.json.*\|Close this issue once the review is done.*)|- [ ] Close this issue once the review is done — the tracked version was already bumped when this issue was opened|" "$BODY_FILE"
+
+            {
+              printf '\n---\n\n### Release notes — %s\n\n' "$LATEST"
+              printf '%s\n' "$RELEASE_NOTES"
+            } >> "$BODY_FILE"
+
+            gh issue edit "$EXISTING_NUM" --title "$TITLE" --body-file "$BODY_FILE"
+          else
+            cat > "$BODY_FILE" <<EOF
           ## alibaba/open-code-review $LATEST
 
           sereview derives its **review rule taxonomy** and **deterministic pipeline
@@ -70,16 +99,16 @@ jobs:
           - [ ] Update \`src/core/rules.ts\` and bump \`RULEBOOK_VERSION\` if rules changed
           - [ ] Update \`skill/SKILL.md\` if the review workflow improved
           - [ ] Update \`NOTICE\` attribution if the derived scope changed
-          - [ ] Update \`.github/upstream-versions.json\` once the review is done (or close this issue)
+          - [ ] Close this issue once the review is done — the tracked version in \`.github/upstream-versions.json\` was already bumped when this issue was opened
           EOF
 
-          gh issue create \
-            --title "⬆️ Upstream: alibaba/open-code-review $LATEST" \
-            --body-file "$BODY_FILE"
+            gh issue create --title "$TITLE" --body-file "$BODY_FILE"
+          fi
 
           jq --arg v "$LATEST" '."alibaba/open-code-review" = $v' \
             .github/upstream-versions.json > tmp.json
           mv tmp.json .github/upstream-versions.json
           git add .github/upstream-versions.json
           git commit -m "chore: track open-code-review $LATEST"
+          git pull --rebase
           git push

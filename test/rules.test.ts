@@ -48,6 +48,18 @@ test('matchRules: innerHTML assignment → xss', () => {
   assert.ok(ids([added('web/view.ts', 'element.innerHTML = userInput;')]).includes('xss'));
 });
 
+test('detectLanguage: .astro maps to astro', () => {
+  assert.equal(detectLanguage('src/pages/index.astro'), 'astro');
+});
+
+test('matchRules: Astro set:html directive → xss', () => {
+  assert.ok(ids([added('src/pages/Post.astro', '<article set:html={post.body} />')]).includes('xss'));
+  const xss = matchRules([added('src/pages/Post.astro', '<article set:html={post.body} />')]).find(
+    (r) => r.id === 'xss',
+  );
+  assert.ok(xss!.appliesTo.includes('astro'), 'xss rule should advertise astro applicability');
+});
+
 test('matchRules: query inside a loop → n-plus-1', () => {
   const fs = [
     added(
