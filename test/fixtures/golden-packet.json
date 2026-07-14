@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "kind": "github-pr",
+    "ref": "owner/repo#42",
+    "title": "Golden fixture PR",
+    "baseSha": "base0000",
+    "headSha": "head1111"
+  },
+  "bundles": [
+    {
+      "id": "bundle-1",
+      "files": [
+        {
+          "file": {
+            "path": "src/db.ts",
+            "status": "modified",
+            "language": "typescript",
+            "additions": 2,
+            "deletions": 1,
+            "binary": false
+          },
+          "hunks": [
+            {
+              "header": "@@ -1,3 +1,4 @@ export function getUser(userId) {",
+              "oldStart": 1,
+              "oldLines": 3,
+              "newStart": 1,
+              "newLines": 4,
+              "lines": [
+                {
+                  "type": "context",
+                  "newLine": 1,
+                  "oldLine": 1,
+                  "content": "export function getUser(userId) {"
+                },
+                {
+                  "type": "del",
+                  "oldLine": 2,
+                  "content": "  return null;"
+                },
+                {
+                  "type": "add",
+                  "newLine": 2,
+                  "content": "  const sql = \"SELECT * FROM users WHERE id = \" + userId;"
+                },
+                {
+                  "type": "add",
+                  "newLine": 3,
+                  "content": "  return db.query(sql);"
+                },
+                {
+                  "type": "context",
+                  "newLine": 4,
+                  "oldLine": 3,
+                  "content": "}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "file": {
+            "path": "config/settings.py",
+            "status": "modified",
+            "language": "python",
+            "additions": 1,
+            "deletions": 0,
+            "binary": false
+          },
+          "hunks": [
+            {
+              "header": "@@ -1,2 +1,3 @@",
+              "oldStart": 1,
+              "oldLines": 2,
+              "newStart": 1,
+              "newLines": 3,
+              "lines": [
+                {
+                  "type": "context",
+                  "newLine": 1,
+                  "oldLine": 1,
+                  "content": "DEBUG = True"
+                },
+                {
+                  "type": "add",
+                  "newLine": 2,
+                  "content": "API_KEY = \"sk-abc123def456ghijkl\""
+                },
+                {
+                  "type": "context",
+                  "newLine": 3,
+                  "oldLine": 2,
+                  "content": "TIMEOUT = 30"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "file": {
+            "path": "web/view.tsx",
+            "status": "modified",
+            "language": "typescript",
+            "additions": 1,
+            "deletions": 0,
+            "binary": false
+          },
+          "hunks": [
+            {
+              "header": "@@ -1,1 +1,2 @@",
+              "oldStart": 1,
+              "oldLines": 1,
+              "newStart": 1,
+              "newLines": 2,
+              "lines": [
+                {
+                  "type": "context",
+                  "newLine": 1,
+                  "oldLine": 1,
+                  "content": "export function render(el, userInput) {"
+                },
+                {
+                  "type": "add",
+                  "newLine": 2,
+                  "content": "  el.innerHTML = userInput;"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "file": {
+            "path": "src/new-name.ts",
+            "previousPath": "src/old-name.ts",
+            "status": "renamed",
+            "language": "typescript",
+            "additions": 1,
+            "deletions": 1,
+            "binary": false
+          },
+          "hunks": [
+            {
+              "header": "@@ -1,2 +1,2 @@",
+              "oldStart": 1,
+              "oldLines": 2,
+              "newStart": 1,
+              "newLines": 2,
+              "lines": [
+                {
+                  "type": "context",
+                  "newLine": 1,
+                  "oldLine": 1,
+                  "content": "export const version = 1;"
+                },
+                {
+                  "type": "del",
+                  "oldLine": 2,
+                  "content": "export const label = \"old\";"
+                },
+                {
+                  "type": "add",
+                  "newLine": 2,
+                  "content": "export const label = \"new\";"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "file": {
+            "path": ".github/workflows/deploy.yml",
+            "status": "modified",
+            "language": "yaml",
+            "additions": 1,
+            "deletions": 0,
+            "binary": false
+          },
+          "hunks": [
+            {
+              "header": "@@ -1,3 +1,4 @@",
+              "oldStart": 1,
+              "oldLines": 3,
+              "newStart": 1,
+              "newLines": 4,
+              "lines": [
+                {
+                  "type": "context",
+                  "newLine": 1,
+                  "oldLine": 1,
+                  "content": "name: Deploy"
+                },
+                {
+                  "type": "context",
+                  "newLine": 2,
+                  "oldLine": 2,
+                  "content": "on: push"
+                },
+                {
+                  "type": "context",
+                  "newLine": 3,
+                  "oldLine": 3,
+                  "content": "jobs:"
+                },
+                {
+                  "type": "add",
+                  "newLine": 4,
+                  "content": "    uses: some/action@v1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "matchedRules": [
+        {
+          "id": "sql-injection",
+          "category": "security",
+          "severityHint": "high",
+          "title": "SQL injection via string-built query",
+          "guidance": "A SQL statement appears to be assembled with string concatenation or interpolation. Check whether any interpolated value can originate from user input; if so, require parameterized queries / prepared statements instead of building SQL by hand.",
+          "appliesTo": [
+            "backend",
+            "database",
+            "javascript",
+            "typescript",
+            "python",
+            "java",
+            "go",
+            "php",
+            "ruby"
+          ],
+          "matchedPaths": [
+            "src/db.ts"
+          ]
+        },
+        {
+          "id": "xss",
+          "category": "security",
+          "severityHint": "high",
+          "title": "Possible XSS via an unescaped HTML sink",
+          "guidance": "Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Confirm the value is escaped/sanitized, or rendered as text rather than HTML.",
+          "appliesTo": [
+            "frontend",
+            "javascript",
+            "typescript",
+            "html",
+            "vue",
+            "svelte",
+            "astro"
+          ],
+          "matchedPaths": [
+            "web/view.tsx"
+          ]
+        },
+        {
+          "id": "secret-exposure",
+          "category": "security",
+          "severityHint": "critical",
+          "title": "Hardcoded secret or credential",
+          "guidance": "An added line looks like a hardcoded secret (API key, token, password, private key). Move it to a secret store / environment variable, and rotate the value if it is real and was committed.",
+          "appliesTo": [
+            "any"
+          ],
+          "matchedPaths": [
+            "config/settings.py"
+          ]
+        },
+        {
+          "id": "github-actions-security",
+          "category": "security",
+          "severityHint": "high",
+          "title": "GitHub Actions security issue",
+          "guidance": "Check for: (1) pull_request_target with checkout of PR head — runs untrusted code with write permissions; (2) secrets interpolated in run: blocks (echo ${{ secrets.X }}) — must be passed via env: instead; (3) user-controlled expressions (${{ github.event.issue.title }}) used directly in run: — enables script injection; (4) third-party actions pinned to a mutable tag rather than a full commit SHA — tags can be hijacked.",
+          "appliesTo": [
+            "ci",
+            "yaml"
+          ],
+          "matchedPaths": [
+            ".github/workflows/deploy.yml"
+          ]
+        }
+      ],
+      "tokenEstimate": 199
+    }
+  ],
+  "skipped": [
+    {
+      "path": "assets/logo.png",
+      "reason": "binary"
+    }
+  ],
+  "stats": {
+    "files": 6,
+    "additions": 6,
+    "deletions": 2,
+    "bundles": 1
+  },
+  "rulebookVersion": "sereview-rulebook-4 (2026-07-15)"
+}

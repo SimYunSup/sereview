@@ -14,9 +14,14 @@ already run. No separate API key is involved.
 ## Procedure
 
 1. **Build the packet.** Run the CLI and capture its stdout (JSON):
-   - PR: `npx sereview packet <pr-url | owner/repo#number>`
-   - Local diff: `git diff <base>... | npx sereview packet --diff -`
+   - PR: `npx sereview@^0.1 packet <pr-url | owner/repo#number>`
+   - Local diff: `git diff <base>... | npx sereview@^0.1 packet --diff -`
    - Large PRs: tune `--max-bundle-tokens <n>` (default 8000).
+   - The `@^0.1` pin holds the CLI on a packet schema this skill understands.
+   - **Check the contract before reading further.** This skill targets packet
+     `schemaVersion` **1**. If the packet's `schemaVersion` is higher, stop and
+     tell the user the skill is out of date for their `sereview` version and
+     needs updating — don't guess at unfamiliar fields.
 2. **Get context to read.** If the PR's repo is checked out locally at the PR head,
    you can `Read`/`Grep` the surrounding code (definitions, callers, related
    files) — do that. If you only have the packet, review from its hunks; the hunk
@@ -24,7 +29,8 @@ already run. No separate API key is involved.
 3. **Review bundle by bundle.** For each bundle:
    - Read its `matchedRules`. These are **hints**, not verdicts — a match means
      "look here for this class of bug," nothing more. An empty `matchedRules` does
-     not mean the bundle is clean; still read the hunks.
+     not mean the bundle is clean; still read the hunks. Each rule's optional
+     `matchedPaths` names the files in the bundle it fired on — start there.
    - Walk each file's hunks. For anything suspicious, gather just enough context
      with `Read`/`Grep` to decide. Don't re-read the whole repo — the packet is
      already the pre-filtered surface; stay within it plus the context a finding

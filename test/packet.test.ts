@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPacket, serializePacket } from '../src/core/index.ts';
-import type { MatchedRule, ReviewPacket } from '../src/core/index.ts';
+import type { MatchedRule, ReviewPacket, RuleDefinition } from '../src/core/index.ts';
 
 const DIFF = `diff --git a/src/db.ts b/src/db.ts
 index 111..222 100644
@@ -73,6 +73,48 @@ test('buildPacket: rules override attaches the given rules to every bundle', () 
       ['custom'],
     );
   }
+});
+
+test('buildPacket: custom rulebook replaces the built-in matcher', () => {
+  const rulebook: RuleDefinition[] = [
+    {
+      id: 'has-select',
+      category: 'maintainability',
+      severityHint: 'info',
+      title: 'Mentions SELECT',
+      guidance: 'test rule',
+      appliesTo: ['any'],
+      matches: (c) => /SELECT/i.test(c.addedText),
+    },
+  ];
+  const p = buildPacket({ diff: DIFF, source: src(), rulebook });
+  const rules = p.bundles.flatMap((b) => b.matchedRules.map((r) => r.id));
+  assert.deepEqual(rules, ['has-select']); // custom rule fired, built-ins replaced
+});
+
+test('buildPacket: rules override takes precedence over rulebook', () => {
+  const rulebook: RuleDefinition[] = [
+    {
+      id: 'rb',
+      category: 'style',
+      severityHint: 'info',
+      title: 'T',
+      guidance: 'G',
+      appliesTo: ['any'],
+      matches: () => true,
+    },
+  ];
+  const rules: MatchedRule[] = [
+    { id: 'static', category: 'style', severityHint: 'info', title: 'T', guidance: 'G', appliesTo: ['x'] },
+  ];
+  const p = buildPacket({ diff: DIFF, source: src(), rules, rulebook });
+  for (const b of p.bundles) assert.deepEqual(b.matchedRules.map((r) => r.id), ['static']);
+});
+
+test('buildPacket: built-in matched rules carry matchedPaths', () => {
+  const p = buildPacket({ diff: DIFF, source: src() });
+  const sql = p.bundles.flatMap((b) => b.matchedRules).find((r) => r.id === 'sql-injection');
+  assert.deepEqual(sql?.matchedPaths, ['src/db.ts']);
 });
 
 test('serializePacket: pretty JSON that round-trips to the same object', () => {

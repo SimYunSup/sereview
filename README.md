@@ -95,14 +95,15 @@ data — the review happens when a Claude Code session consumes it via the
       ],
       "matchedRules": [
         { "id": "sql-injection", "category": "security", "severityHint": "high",
-          "title": "SQL injection via string-built query", "guidance": "…", "appliesTo": ["…"] }
+          "title": "SQL injection via string-built query", "guidance": "…",
+          "appliesTo": ["…"], "matchedPaths": ["src/db.ts"] }
       ],
       "tokenEstimate": 73
     }
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-1 (2026-06-25)"
+  "rulebookVersion": "sereview-rulebook-4 (2026-07-15)"
 }
 ```
 
@@ -144,14 +145,15 @@ const packet = buildPacket({
   source: { kind: "local-diff", ref: "HEAD" },
   maxBundleTokens: 8000,                  // optional (default 8000)
   // skip: (f) => f.path.endsWith(".lock") ? "lockfile" : null,  // optional
+  // rulebook: [ /* custom RuleDefinition[] */ ],                 // optional: swap the matched rule set
 });
 console.log(serializePacket(packet));     // pretty JSON
 ```
 
 Other exports: `parseDiff`, `detectLanguage`, `estimateTokens`,
-`DEFAULT_MAX_BUNDLE_TOKENS`, `RULEBOOK_VERSION`, and every type
-(`ReviewPacket`, `ReviewBundle`, `MatchedRule`, `Finding`, `ReviewResult`, …).
-See [`src/core/types.ts`](./src/core/types.ts).
+`DEFAULT_MAX_BUNDLE_TOKENS`, `RULEBOOK_VERSION`, `RULEBOOK`, `matchRules`, and
+every type (`ReviewPacket`, `ReviewBundle`, `MatchedRule`, `RuleDefinition`,
+`Finding`, `ReviewResult`, …). See [`src/core/types.ts`](./src/core/types.ts).
 
 ## Rulebook
 
@@ -168,8 +170,15 @@ A security-leaning starter set, used as **hints** for the reviewer:
 | `npe` | correctness | medium |
 | `race` | concurrency | medium |
 | `n-plus-1` | performance | medium |
+| `github-actions-security` | security | high |
 
 Severity scale: `critical · high · medium · low · info`.
+
+Each rule is **language-gated**: it only fires on a file whose detected language
+is one it covers (`appliesTo`). Rules scoped only by tag (e.g. `secret-exposure`,
+tagged `any`) are language-agnostic and can fire on any file; a file whose
+language can't be detected triggers only those. A matched rule also carries
+`matchedPaths` — the changed files in the bundle it fired on.
 
 ## Architecture (from Open Code Review)
 

@@ -31,7 +31,7 @@ jobs:
           fi
           echo "✅ version match: $TAG_VERSION"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -43,7 +43,9 @@ jobs:
       - run: pnpm build
 
       # npm >= 11.5 is needed for OIDC Trusted Publishing; setup-node's bundled
-      # npm may be older, so refresh it first.
-      - run: npm install -g npm@latest
+      # npm may be older, so refresh it. Pin to the 11 major (a known-good, OIDC-
+      # capable line) rather than @latest so a new major can't change this
+      # id-token:write job under us without review.
+      - run: npm install -g npm@11
       # Build already ran above, so skip lifecycle scripts on publish.
       - run: npm publish --provenance --ignore-scripts
