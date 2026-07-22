@@ -10,6 +10,7 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   m: 'objective-c', mm: 'objective-c',
   sql: 'sql', sh: 'shell', bash: 'shell', zsh: 'shell',
   html: 'html', css: 'css', scss: 'scss', less: 'less', vue: 'vue', svelte: 'svelte', astro: 'astro',
+  ftl: 'freemarker', ftlh: 'freemarker', ftlx: 'freemarker',
   json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', md: 'markdown',
 };
 
@@ -24,9 +25,52 @@ export function detectLanguage(path: string): string | undefined {
   return LANGUAGE_BY_EXT[base.slice(dot + 1).toLowerCase()];
 }
 
-/** Drop a surrounding pair of double quotes (git C-quotes paths with specials). */
+/**
+ * Decode a git C-quoted path body (quotes already stripped): octal byte
+ * escapes (`\ooo`, 1–3 octal digits — each is a raw UTF-8 byte, not a code
+ * point) and the standard backslash escapes (`\\ \" \t \n \r \b \f \a \v`),
+ * then decode the resulting byte sequence as UTF-8. Unescaped characters are
+ * ASCII (git only C-quotes when it needs to) and pass through as-is.
+ */
+function decodeCQuoted(body: string): string {
+  const SIMPLE_ESCAPES: Record<string, number> = {
+    '\\': 0x5c, '"': 0x22, t: 0x09, n: 0x0a, r: 0x0d,
+    b: 0x08, f: 0x0c, a: 0x07, v: 0x0b,
+  };
+  const bytes: number[] = [];
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
+    if (ch !== '\\') {
+      bytes.push(ch.charCodeAt(0));
+      continue;
+    }
+    const next = body[i + 1];
+    if (next !== undefined && next in SIMPLE_ESCAPES) {
+      bytes.push(SIMPLE_ESCAPES[next]!);
+      i++;
+      continue;
+    }
+    const octal = /^[0-7]{1,3}/.exec(body.slice(i + 1));
+    if (octal) {
+      bytes.push(Number.parseInt(octal[0], 8) & 0xff);
+      i += octal[0].length;
+      continue;
+    }
+    bytes.push(0x5c); // unrecognized escape: keep the backslash literally
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
+/**
+ * Strip a surrounding pair of double quotes and decode git's C-quoting (see
+ * {@link decodeCQuoted}), used for paths with specials (git's default
+ * `core.quotepath=true`). Unquoted paths pass through untouched — a
+ * backslash there is literal (e.g. a Windows-style name), not an escape.
+ */
 function unquote(p: string): string {
-  return p.length >= 2 && p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p;
+  return p.length >= 2 && p.startsWith('"') && p.endsWith('"')
+    ? decodeCQuoted(p.slice(1, -1))
+    : p;
 }
 
 /** Strip the leading `a/` or `b/` diff prefix (leaving `/dev/null` untouched). */
@@ -40,7 +84,7 @@ function parseGitHeaderPaths(header: string): { old?: string; new?: string } {
   const rest = header.slice('diff --git '.length);
   if (rest.startsWith('"')) {
     const m = /^"(.*?)" "(.*?)"$/.exec(rest);
-    if (m) return { old: stripPrefix(m[1]!), new: stripPrefix(m[2]!) };
+    if (m) return { old: stripPrefix(decodeCQuoted(m[1]!)), new: stripPrefix(decodeCQuoted(m[2]!)) };
   }
   const parts = rest.split(' ');
   if (parts.length === 2) return { old: stripPrefix(parts[0]!), new: stripPrefix(parts[1]!) };
