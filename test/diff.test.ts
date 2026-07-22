@@ -200,3 +200,44 @@ test('parseDiff: a filename containing a space is not truncated', () => {
   assert.equal(b!.file.path, 'my file.bin');
   assert.equal(b!.file.binary, true);
 });
+
+test('parseDiff: C-quoted non-ASCII path decodes octal escapes as UTF-8', () => {
+  const d =
+    'diff --git "a/src/caf\\303\\251/\\346\\226\\207\\344\\273\\266.ts" "b/src/caf\\303\\251/\\346\\226\\207\\344\\273\\266.ts"\n' +
+    'index 1111111..2222222 100644\n' +
+    '--- "a/src/caf\\303\\251/\\346\\226\\207\\344\\273\\266.ts"\n' +
+    '+++ "b/src/caf\\303\\251/\\346\\226\\207\\344\\273\\266.ts"\n' +
+    '@@ -1,1 +1,1 @@\n' +
+    '-const a = 1;\n' +
+    '+const a = 2;\n';
+  const [b] = parseDiff(d);
+  assert.equal(b!.file.path, 'src/café/文件.ts');
+  assert.equal(b!.file.language, 'typescript');
+});
+
+test('parseDiff: C-quoted "diff --git" header decodes both path captures', () => {
+  // Exercise parseGitHeaderPaths's fallback (used when neither ---/+++ nor
+  // rename/copy extended-header lines supply the path) for both captures:
+  // fromHeader.new (added-style, no /dev/null content lines) and
+  // fromHeader.old (deleted-style).
+  const added = 'diff --git "a/src/caf\\303\\251.ts" "b/src/n\\303\\251o.ts"\nnew file mode 100644\n';
+  const [ba] = parseDiff(added);
+  assert.equal(ba!.file.path, 'src/néo.ts');
+
+  const deleted = 'diff --git "a/src/caf\\303\\251.ts" "b/src/n\\303\\251o.ts"\ndeleted file mode 100644\n';
+  const [bd] = parseDiff(deleted);
+  assert.equal(bd!.file.path, 'src/café.ts');
+});
+
+test('parseDiff: an unquoted path containing a literal backslash stays untouched', () => {
+  const d =
+    'diff --git a/src\\weird.ts b/src\\weird.ts\n' +
+    'index 1111111..2222222 100644\n' +
+    '--- a/src\\weird.ts\n' +
+    '+++ b/src\\weird.ts\n' +
+    '@@ -1,1 +1,1 @@\n' +
+    '-const a = 1;\n' +
+    '+const a = 2;\n';
+  const [b] = parseDiff(d);
+  assert.equal(b!.file.path, 'src\\weird.ts');
+});

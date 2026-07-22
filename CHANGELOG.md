@@ -18,6 +18,13 @@ to [Semantic Versioning](https://semver.org/).
   order. Optional, so the packet stays `schemaVersion` 1.
 - **Golden-packet regression test:** freezes the serialized packet for a
   representative diff; regenerate with `UPDATE_GOLDEN=1 pnpm test`.
+- **`template-injection` rule (rulebook v5):** FreeMarker SSTI signals
+  (`?new()`, `?eval`, `?api`, `Execute`/`ObjectConstructor`, dynamic
+  `<#include>`, `?no_esc`), with `.ftl`/`.ftlh`/`.ftlx` mapping to a new
+  `freemarker` language. Derived from the FreeMarker rules added in upstream
+  open-code-review v1.7.8…v1.7.13. (Upstream's new `.po` gettext rules were
+  reviewed and intentionally not adopted — i18n-correctness rules are outside
+  sereview's security-leaning starter rulebook.)
 
 ### Changed
 
@@ -40,6 +47,11 @@ to [Semantic Versioning](https://semver.org/).
 
 - **Diff parser:** a whitespace-stripped empty context line no longer truncates
   the rest of a hunk.
+- **Diff parser:** C-quoted paths (git's default `core.quotepath=true`) now
+  decode octal/backslash escapes, so non-ASCII paths (e.g. `src/café/文件.ts`)
+  parse to real UTF-8 paths with correct language detection. Mirrors upstream's
+  `core.quotepath=false` fix at the parser level (sereview consumes diffs
+  rather than running git). (from the open-code-review v1.7.8…v1.7.13 sync)
 
 ### Docs
 

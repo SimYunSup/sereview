@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-4 (2026-07-15)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-5 (2026-07-22)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,7 +23,7 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of nine heuristics. Each `matches`
+ * The starter rulebook: a security-leaning set of eleven heuristics. Each `matches`
  * is intentionally conservative — it flags *candidates* so the host Claude Code
  * session knows where to look; it never decides that a finding is real.
  */
@@ -168,6 +168,22 @@ export const RULEBOOK: RuleDefinition[] = [
           c.addedText,
         ) ||
         /uses:\s+(?!actions\/)[\w/-]+@(?![\da-f]{40})[^#\s\n]+/i.test(c.addedText)),
+  },
+  {
+    id: 'template-injection',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Possible server-side template injection (SSTI)',
+    guidance:
+      'FreeMarker builtins that reach into the JVM (?new, ?eval, ?api) or classes like freemarker.template.utility.Execute / ObjectConstructor let a template execute arbitrary code or shell commands, and a dynamically built <#include>/<#import> target lets an attacker choose the template to render. Verify template names/bodies never derive from request input and that a restricted TemplateClassResolver is configured; also treat ?no_esc / <#noautoesc> on user-controlled data as an escaping escape-hatch worth double-checking.',
+    appliesTo: ['security', 'freemarker', 'java'],
+    matches: (c) =>
+      /\?\s*new\s*\(/.test(c.addedText) ||
+      /\?eval\b/i.test(c.addedText) ||
+      /\?api\b/i.test(c.addedText) ||
+      /freemarker\.template\.utility\.Execute|ObjectConstructor/.test(c.addedText) ||
+      /<#(include|import)[^\n]*\$\{/.test(c.addedText) ||
+      /\?no_esc\b|<#noautoesc/i.test(c.addedText),
   },
 ];
 

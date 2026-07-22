@@ -143,10 +143,35 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all ten rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 10);
+test('RULEBOOK exposes all eleven rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 11);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
-  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security'];
+  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security', 'template-injection'];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
+});
+
+test('detectLanguage: .ftl / .ftlh map to freemarker', () => {
+  assert.equal(detectLanguage('templates/mail.ftl'), 'freemarker');
+  assert.equal(detectLanguage('t/page.ftlh'), 'freemarker');
+});
+
+test('matchRules: FreeMarker ?new() builtin in a .ftl file → template-injection', () => {
+  const fs = [added('templates/mail.ftl', '<#assign ex = "freemarker.template.utility.Execute"?new()>')];
+  assert.ok(ids(fs).includes('template-injection'));
+});
+
+test('matchRules: dynamic <#include> target → template-injection', () => {
+  const fs = [added('t/page.ftlh', '<#include "/tpl/${userPath}.ftl">')];
+  assert.ok(ids(fs).includes('template-injection'));
+});
+
+test('matchRules: language gating — same dangerous text in a .py file does NOT fire template-injection', () => {
+  const fs = [added('scripts/build.py', '# ex = "freemarker.template.utility.Execute"?new()')];
+  assert.ok(!ids(fs).includes('template-injection'));
+});
+
+test('matchRules: benign FreeMarker interpolation does NOT fire template-injection', () => {
+  const fs = [added('templates/greeting.ftl', '<p>${name?html}</p>')];
+  assert.ok(!ids(fs).includes('template-injection'));
 });
