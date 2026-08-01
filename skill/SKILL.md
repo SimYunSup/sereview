@@ -66,9 +66,9 @@ already run. No separate API key is involved.
 
 `sql-injection` · `xss` · `ssrf` · `path-traversal` · `secret-exposure` ·
 `authz` · `npe` · `race` · `n-plus-1` · `github-actions-security` ·
-`template-injection`. Each carries `guidance` in the packet describing what to
-check. Findings are not limited to these — they focus attention, they don't
-cap it.
+`template-injection` · `rust-macro-correctness` · `julia-security`. Each carries
+`guidance` in the packet describing what to check. Findings are not limited to
+these — they focus attention, they don't cap it.
 
 ## Output: `ReviewResult`
 
@@ -96,6 +96,13 @@ Return JSON of this shape (also in `sereview`'s type exports):
   "countsBySeverity": { "critical": 0, "high": 1, "medium": 0, "low": 0, "info": 0 }
 }
 ```
+
+`severity` and `category` are closed sets, written **verbatim in lowercase**:
+`critical` · `high` · `medium` · `low` · `info` for severity, and `security` ·
+`correctness` · `concurrency` · `performance` · `maintainability` · `style` for
+category. Don't invent a value, don't title-case one, and don't leave either
+field out — a consumer reads them as canonical metadata, not free text. If no
+category is a clean fit, pick the closest one and say why in `body`.
 
 When you find nothing, return `findings: []` and a `summary` stating **what you
 checked** (files/bundles reviewed and the classes of issue you looked for), so the

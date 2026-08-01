@@ -25,6 +25,25 @@ to [Semantic Versioning](https://semver.org/).
   open-code-review v1.7.8…v1.7.13. (Upstream's new `.po` gettext rules were
   reviewed and intentionally not adopted — i18n-correctness rules are outside
   sereview's security-leaning starter rulebook.)
+- **`rust-macro-correctness` rule (rulebook v6):** fires only when a diff
+  *defines* a macro (`macro_rules!` or a `#[proc_macro*]` attribute), never on
+  an invocation, and points the reviewer at the classic expansion footguns —
+  `$x:expr` interpolated twice, missing `$crate::`, unparenthesized `$t:tt`
+  re-emission, proc macros that `panic!` instead of emitting `syn::Error`, and
+  broken hygiene. Derived from the `Macros and Metaprogramming` section added to
+  upstream open-code-review's `rust.md` (v1.7.14…v1.7.17).
+- **Julia support (rulebook v6):** `.jl` maps to a new `julia` language, Julia's
+  `test/` layout (e.g. `test/runtests.jl`) joins the default skip filter, and a
+  `julia-security` rule covers the language's security-sensitive constructs —
+  `eval`/`@eval`/`Meta.parse`/`include_string` on external input, a deliberate
+  `sh -c`/`bash -c` invocation (a plain backtick `Cmd` needs no shell and is not
+  flagged), `ccall`/`unsafe_*`/`pointer`, and SQL built by interpolation.
+  Derived from upstream's Julia allowlist + `julia.md` (v1.7.14…v1.7.17).
+  (Upstream's Julia type-stability, dispatch, and performance guidance was
+  reviewed and intentionally not adopted — like the `.po` rules before it, that
+  is language-idiom advice rather than a security/correctness defect class.
+  Upstream's new OpenCode plugin is out of scope too: sereview has no
+  model-calling agent, and its host integration is `skill/SKILL.md`.)
 
 ### Changed
 
@@ -58,6 +77,11 @@ to [Semantic Versioning](https://semver.org/).
 - README / README.ko rule table includes `github-actions-security`, the sample
   packet shows the current rulebook version, and `skill/SKILL.md` verifies
   `schemaVersion` and pins the CLI to `sereview@^0.1`.
+- **`skill/SKILL.md` result contract:** `severity` and `category` are stated as
+  closed sets that must be written verbatim in lowercase, with instructions for
+  the no-clean-fit case. sereview never parses model output, so upstream's
+  `code_comment` enum normalization (v1.7.14…v1.7.17) applies at the only place
+  sereview owns: the reviewer contract.
 
 ## [0.1.2] - 2026-06-28
 

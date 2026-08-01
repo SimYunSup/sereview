@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-5 (2026-07-22)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-6 (2026-08-02)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,7 +23,7 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of eleven heuristics. Each `matches`
+ * The starter rulebook: a security-leaning set of thirteen heuristics. Each `matches`
  * is intentionally conservative — it flags *candidates* so the host Claude Code
  * session knows where to look; it never decides that a finding is real.
  */
@@ -184,6 +184,31 @@ export const RULEBOOK: RuleDefinition[] = [
       /freemarker\.template\.utility\.Execute|ObjectConstructor/.test(c.addedText) ||
       /<#(include|import)[^\n]*\$\{/.test(c.addedText) ||
       /\?no_esc\b|<#noautoesc/i.test(c.addedText),
+  },
+  {
+    id: 'rust-macro-correctness',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'Rust macro definition (macro_rules! / procedural macro)',
+    guidance:
+      'The diff DEFINES a macro, so review the expansion itself — ordinary macro invocations are out of scope. (1) An `$x:expr` fragment interpolated more than once re-runs the caller\'s expression, side effects included; bind it to a `let` once inside the expansion. (2) An exported macro that names items without `$crate::` resolves against the *calling* crate: the defining crate compiles clean and the consumer fails with E0433. (3) A token-tree (`$t:tt`) fragment re-emitted without wrapping parentheses can silently change operator precedence — this applies to `tt` interpolation only, since an `:expr` fragment and a whole expansion are each parsed as one complete expression. (4) A procedural macro that `unwrap()`/`expect()`/`panic!`s on malformed input should emit a `syn::Error` / `compile_error!` with a useful span instead. (5) Hygiene assumptions that break: generated identifiers relying on call-site names, or items that collide when the macro is invoked twice in the same module.',
+    appliesTo: ['correctness', 'rust'],
+    matches: (c) => /\bmacro_rules\s*!/.test(c.addedText) || /#\[proc_macro(_derive|_attribute)?\b/.test(c.addedText),
+  },
+  {
+    id: 'julia-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Security-sensitive Julia construct',
+    guidance:
+      'A Julia construct that is only safe on trusted input. Check that: `eval` / `@eval` / `Meta.parse` / `include_string` never see externally derived input (code injection); an explicit shell invocation (`sh -c`, `bash -c`) never interpolates untrusted input — a plain backtick `Cmd` passes its arguments straight to the process without a shell, so the risk arises only when a shell is invoked deliberately; `ccall`, `unsafe_*` and raw `pointer` use validate length, alignment, lifetime and null-ness of the underlying memory; SQL and filesystem paths are not built by concatenating/interpolating external input; and secrets, tokens or PII are never logged.',
+    appliesTo: ['security', 'julia'],
+    matches: (c) =>
+      /\b(eval|include_string)\s*\(|@eval\b|\bMeta\.parse\s*\(/.test(c.addedText) ||
+      /\b(sh|bash)\s+-c\b|["'](sh|bash)["']\s*,\s*["']-c["']/.test(c.addedText) ||
+      /\bccall\s*\(|\bunsafe_\w+|\bpointer\s*\(/.test(c.addedText) ||
+      (/\b(select\s+.+\s+from|insert\s+into|update\s+.+\s+set|delete\s+from)\b/i.test(c.addedText) &&
+        /\$\(|\$\w/.test(c.addedText)),
   },
 ];
 

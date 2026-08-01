@@ -50,7 +50,8 @@ export function defaultSkip(f: ChangedFile): string | null {
     /(^|\/)__tests__\//.test(path) ||
     /\.(test|spec)\.(jsx?|tsx?|mjs|cjs)$/.test(path) ||
     /_test\.go$/.test(path) ||
-    /(^|\/)\w+Test\.(java|kt)$/.test(path)
+    /(^|\/)\w+Test\.(java|kt)$/.test(path) ||
+    /(^|\/)test\/.*\.jl$/.test(path)
   ) {
     return 'test';
   }
