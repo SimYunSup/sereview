@@ -4,7 +4,7 @@ import type { BundledFile, ChangedFile, DiffHunk, DiffLine, FileStatus } from '.
 const LANGUAGE_BY_EXT: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', mts: 'typescript', cts: 'typescript',
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-  py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java',
+  py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', jl: 'julia',
   kt: 'kotlin', kts: 'kotlin', cs: 'csharp', php: 'php', swift: 'swift', scala: 'scala',
   c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
   m: 'objective-c', mm: 'objective-c',

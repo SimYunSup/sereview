@@ -31,13 +31,13 @@ test('defaultSkip: generated / vendored directories', () => {
 });
 
 test('defaultSkip: test files', () => {
-  for (const p of ['src/__tests__/a.ts', 'src/a.test.ts', 'src/a.spec.tsx', 'pkg/foo_test.go', 'src/FooTest.java', 'app/BarTest.kt']) {
+  for (const p of ['src/__tests__/a.ts', 'src/a.test.ts', 'src/a.spec.tsx', 'pkg/foo_test.go', 'src/FooTest.java', 'app/BarTest.kt', 'test/runtests.jl', 'pkg/test/unit/solver.jl']) {
     assert.equal(defaultSkip(file(p)), 'test', p);
   }
 });
 
 test('defaultSkip: normal source / docs files are kept', () => {
-  for (const p of ['src/index.ts', 'app/main.go', 'lib/util.py', 'README.md', 'src/components/Button.tsx']) {
+  for (const p of ['src/index.ts', 'app/main.go', 'lib/util.py', 'README.md', 'src/components/Button.tsx', 'src/solver.jl', 'src/latest/model.jl']) {
     assert.equal(defaultSkip(file(p)), null, p);
   }
 });

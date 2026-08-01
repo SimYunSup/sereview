@@ -143,11 +143,11 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all eleven rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 11);
+test('RULEBOOK exposes all thirteen rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 13);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
-  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security', 'template-injection'];
+  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security'];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
 });
 
@@ -174,4 +174,52 @@ test('matchRules: language gating — same dangerous text in a .py file does NOT
 test('matchRules: benign FreeMarker interpolation does NOT fire template-injection', () => {
   const fs = [added('templates/greeting.ftl', '<p>${name?html}</p>')];
   assert.ok(!ids(fs).includes('template-injection'));
+});
+
+test('detectLanguage: .jl maps to julia', () => {
+  assert.equal(detectLanguage('src/solver.jl'), 'julia');
+});
+
+test('matchRules: macro_rules! definition in a .rs file → rust-macro-correctness', () => {
+  const fs = [
+    added(
+      'src/macros.rs',
+      'macro_rules! twice {',
+      '    ($x:expr) => { $x + $x };',
+      '}',
+    ),
+  ];
+  assert.ok(ids(fs).includes('rust-macro-correctness'));
+});
+
+test('matchRules: a procedural-macro attribute → rust-macro-correctness', () => {
+  const fs = [added('derive/src/lib.rs', '#[proc_macro_derive(Builder)]', 'pub fn derive_builder(input: TokenStream) -> TokenStream {')];
+  assert.ok(ids(fs).includes('rust-macro-correctness'));
+});
+
+test('matchRules: an ordinary macro invocation does NOT fire rust-macro-correctness', () => {
+  // Upstream guards the section to macro *definitions*; invocations are noise.
+  const fs = [added('src/main.rs', 'println!("{}", vec![1, 2, 3].len());')];
+  assert.ok(!ids(fs).includes('rust-macro-correctness'));
+});
+
+test('matchRules: eval of parsed input in a .jl file → julia-security', () => {
+  const fs = [added('src/run.jl', 'eval(Meta.parse(user_input))')];
+  assert.ok(ids(fs).includes('julia-security'));
+});
+
+test('matchRules: unsafe FFI in a .jl file → julia-security', () => {
+  const fs = [added('src/ffi.jl', 'v = unsafe_load(ptr, i)', 'ccall((:memcpy, "libc"), Ptr{Cvoid}, (Ptr{Cvoid},), dst)')];
+  assert.ok(ids(fs).includes('julia-security'));
+});
+
+test('matchRules: language gating — the same Julia construct in a .py file does NOT fire julia-security', () => {
+  const fs = [added('scripts/run.py', '# eval(Meta.parse(user_input))')];
+  assert.ok(!ids(fs).includes('julia-security'));
+});
+
+test('matchRules: a backtick Cmd without a shell does NOT fire julia-security', () => {
+  // Julia backticks pass arguments straight to the process — no shell involved.
+  const fs = [added('src/tools.jl', 'run(`convert $input out.png`)')];
+  assert.ok(!ids(fs).includes('julia-security'));
 });
