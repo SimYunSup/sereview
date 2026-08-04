@@ -100,7 +100,7 @@ sereview --version
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-6 (2026-08-02)"
+  "rulebookVersion": "sereview-rulebook-7 (2026-08-04)"
 }
 ```
 
@@ -170,6 +170,7 @@ console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 | `template-injection` | security | high |
 | `rust-macro-correctness` | correctness | medium |
 | `julia-security` | security | high |
+| `iac-security` | security | high |
 
 심각도 단계: `critical · high · medium · low · info`.
 

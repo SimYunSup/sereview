@@ -103,7 +103,7 @@ data — the review happens when a Claude Code session consumes it via the
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-6 (2026-08-02)"
+  "rulebookVersion": "sereview-rulebook-7 (2026-08-04)"
 }
 ```
 
@@ -174,6 +174,7 @@ A security-leaning starter set, used as **hints** for the reviewer:
 | `template-injection` | security | high |
 | `rust-macro-correctness` | correctness | medium |
 | `julia-security` | security | high |
+| `iac-security` | security | high |
 
 Severity scale: `critical · high · medium · low · info`.
 
