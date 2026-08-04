@@ -5,12 +5,17 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', mts: 'typescript', cts: 'typescript',
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
   py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', jl: 'julia',
-  kt: 'kotlin', kts: 'kotlin', cs: 'csharp', php: 'php', swift: 'swift', scala: 'scala',
+  kt: 'kotlin', kts: 'kotlin', cs: 'csharp', php: 'php', phtml: 'php', swift: 'swift', scala: 'scala',
   c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
   m: 'objective-c', mm: 'objective-c',
   sql: 'sql', sh: 'shell', bash: 'shell', zsh: 'shell',
   html: 'html', css: 'css', scss: 'scss', less: 'less', vue: 'vue', svelte: 'svelte', astro: 'astro',
   ftl: 'freemarker', ftlh: 'freemarker', ftlx: 'freemarker',
+  // .tfstate is included alongside the upstream-mirrored .tf/.tfvars/.hcl set
+  // so a committed state file (checked by the iac-security rule) is detected
+  // as terraform rather than falling through as an unknown language.
+  tf: 'terraform', tfvars: 'terraform', hcl: 'terraform', tfstate: 'terraform',
+  bicep: 'bicep', proto: 'protobuf', prisma: 'prisma',
   json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', md: 'markdown',
 };
 
@@ -19,6 +24,9 @@ export const KNOWN_LANGUAGES: ReadonlySet<string> = new Set(Object.values(LANGUA
 
 /** Derive a language id from a path's extension (dotfiles yield `undefined`). */
 export function detectLanguage(path: string): string | undefined {
+  // git's lookup only sees the last extension, so `terraform.tfstate.backup`
+  // would resolve to 'backup' and miss iac-security's language gate — special-case it.
+  if (/\.tfstate\.backup$/i.test(path)) return 'terraform';
   const base = path.slice(path.lastIndexOf('/') + 1);
   const dot = base.lastIndexOf('.');
   if (dot <= 0) return undefined;

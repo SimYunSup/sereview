@@ -44,6 +44,34 @@ to [Semantic Versioning](https://semver.org/).
   is language-idiom advice rather than a security/correctness defect class.
   Upstream's new OpenCode plugin is out of scope too: sereview has no
   model-calling agent, and its host integration is `skill/SKILL.md`.)
+- **`iac-security` rule (rulebook v7):** `.tf`/`.tfvars`/`.hcl` map to a new
+  `terraform` language and `.bicep` to a new `bicep` language, and an
+  `iac-security` rule flags an unrestricted source (`0.0.0.0/0`, `::/0`) on a
+  security group / NSG rule, a wildcard `Action`/`Resource` in an inline IAM
+  policy, `publicNetworkAccess: 'Enabled'` (Bicep) or an equivalent
+  `Internet`-facing NSG source, and a committed `terraform.tfstate` (or
+  `.tfstate.backup`) file. Derived from the new `terraform.md`/`bicep.md`
+  security sections in upstream open-code-review (v1.7.17…v1.8.6). (Upstream's
+  companion `go.md`/`php.md` were reviewed and intentionally not adopted: they
+  are agent review instructions that presuppose `file_read`/`code_search`
+  verification, which is `skill/SKILL.md`'s job here, not a deterministic
+  `matches` heuristic. `protobuf.md`'s wire-compatibility checks need an
+  old-side diff to compare field numbers/types against, so an `addedText`-only
+  heuristic could only fire on every `.proto` change with no evidence — not
+  adopted. `prisma.md` and `composer_json.md` need database state / lockfile
+  context sereview doesn't have access to — not adopted. The new language
+  mappings for these upstream doc sets *are* adopted where they're
+  self-contained: `.proto` → `protobuf`, `.prisma` → `prisma`, and `.phtml` →
+  `php`, so the existing language-gated rules — `sql-injection`,
+  `path-traversal` — already cover `.phtml` files.)
+- **Default skip filter (upstream #683 exclude-list expansion mirror):**
+  `**/testdata/**` and `**/fixtures/**` directories now skip with reason
+  `'test data'`, and `**/*.generated.*`, `**/*.gen.go`, and `**/*.pb.{go,cc,h}`
+  now skip as `'generated'`. From the open-code-review v1.7.17…v1.8.6 sync.
+  (Upstream's `index <old>..<new>` header-parsing fix does not apply here:
+  sereview's diff parser already treats any unrecognized extended-header line —
+  including `index `/`similarity index ` — as opaque and skips it, so no
+  parser change was needed.)
 
 ### Changed
 

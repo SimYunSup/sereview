@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-6 (2026-08-02)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-7 (2026-08-04)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,7 +23,7 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of thirteen heuristics. Each `matches`
+ * The starter rulebook: a security-leaning set of fourteen heuristics. Each `matches`
  * is intentionally conservative — it flags *candidates* so the host Claude Code
  * session knows where to look; it never decides that a finding is real.
  */
@@ -209,6 +209,30 @@ export const RULEBOOK: RuleDefinition[] = [
       /\bccall\s*\(|\bunsafe_\w+|\bpointer\s*\(/.test(c.addedText) ||
       (/\b(select\s+.+\s+from|insert\s+into|update\s+.+\s+set|delete\s+from)\b/i.test(c.addedText) &&
         /\$\(|\$\w/.test(c.addedText)),
+  },
+  {
+    id: 'iac-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Security-sensitive infrastructure-as-code change',
+    guidance:
+      'Infrastructure-as-code touches security-sensitive network or access-control state. Check whether: an unrestricted source (`0.0.0.0/0`, `::/0`, or `*`) opens a sensitive port (SSH 22, RDP 3389, a database port) or all ports to the public internet; an IAM/role policy uses a wildcard `Action`/`Resource` instead of the narrowest set the workload actually needs; a storage account/bucket\'s public access or `publicNetworkAccess: \'Enabled\'` (Bicep) / `public_network_access_enabled = true` (Terraform) is an intentional, reviewed exposure rather than a default left open; a committed `terraform.tfstate` (or `.tfstate.backup`) file can hold secrets and resource attributes in plaintext, so it must be removed, purged from history, and any exposed credentials rotated; and a variable/parameter that carries a credential is marked `sensitive = true` (Terraform) or `@secure()` (Bicep) so it never lands in logs or state output.',
+    appliesTo: ['security', 'terraform', 'bicep'],
+    matches: (c) => {
+      if (c.paths.some((p) => /\.tfstate(\.backup)?$/i.test(p))) return true;
+      return (
+        // unrestricted CIDR alone isn't a signal (e.g. a route table's default route);
+        // require it alongside a security group/NSG rule context, per the guidance above
+        (/(^|[^\d.])0\.0\.0\.0\/0|::\/0/.test(c.addedText) &&
+          /\b(ingress|security_rule|security_group|network_acl|firewall|cidr_blocks|source_address_prefix(es)?|source_ranges)\b|securityRules|sourceAddressPrefix/i.test(
+            c.addedText,
+          )) ||
+        /"(Action|Resource)"\s*:\s*"\*"/.test(c.addedText) ||
+        /publicNetworkAccess['"\s:=]+'?"?Enabled/i.test(c.addedText) ||
+        /public_network_access_enabled\s*=\s*true/i.test(c.addedText) ||
+        /sourceAddressPrefix['"\s:=]+'?"?(\*|Internet)/i.test(c.addedText)
+      );
+    },
   },
 ];
 

@@ -143,11 +143,11 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all thirteen rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 13);
+test('RULEBOOK exposes all fourteen rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 14);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
-  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security'];
+  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security', 'iac-security'];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
 });
 
@@ -222,4 +222,58 @@ test('matchRules: a backtick Cmd without a shell does NOT fire julia-security', 
   // Julia backticks pass arguments straight to the process — no shell involved.
   const fs = [added('src/tools.jl', 'run(`convert $input out.png`)')];
   assert.ok(!ids(fs).includes('julia-security'));
+});
+
+test('detectLanguage: .tf / .bicep / .proto / .phtml / .prisma map to their languages', () => {
+  assert.equal(detectLanguage('main.tf'), 'terraform');
+  assert.equal(detectLanguage('infra/network.bicep'), 'bicep');
+  assert.equal(detectLanguage('api/message.proto'), 'protobuf');
+  assert.equal(detectLanguage('templates/page.phtml'), 'php');
+  assert.equal(detectLanguage('schema.prisma'), 'prisma');
+  assert.equal(detectLanguage('infra/terraform.tfstate.backup'), 'terraform');
+});
+
+test('matchRules: unrestricted CIDR in a .tf file → iac-security', () => {
+  const fs = [added('infra/sg.tf', 'cidr_blocks = ["0.0.0.0/0"]')];
+  assert.ok(ids(fs).includes('iac-security'));
+});
+
+test('matchRules: publicNetworkAccess Enabled in a .bicep file → iac-security', () => {
+  const fs = [added('infra/storage.bicep', "publicNetworkAccess: 'Enabled'")];
+  assert.ok(ids(fs).includes('iac-security'));
+});
+
+test('matchRules: public_network_access_enabled = true in a .tf file → iac-security', () => {
+  const fs = [added('infra/storage.tf', 'public_network_access_enabled = true')];
+  assert.ok(ids(fs).includes('iac-security'));
+});
+
+test('matchRules: a committed terraform.tfstate file → iac-security', () => {
+  const fs = [added('infra/terraform.tfstate', '{"version": 4}')];
+  assert.ok(ids(fs).includes('iac-security'));
+});
+
+test('matchRules: a committed .tfstate.backup file → iac-security', () => {
+  const fs = [added('infra/terraform.tfstate.backup', '{"version": 4}')];
+  assert.ok(ids(fs).includes('iac-security'));
+});
+
+test('matchRules: language gating — the same 0.0.0.0/0 text in a .py file does NOT fire iac-security', () => {
+  const fs = [added('scripts/net.py', 'cidr_blocks = ["0.0.0.0/0"]')];
+  assert.ok(!ids(fs).includes('iac-security'));
+});
+
+test('matchRules: a default route 0.0.0.0/0 without a network-rule signal does NOT fire iac-security', () => {
+  const fs = [added('infra/routes.tf', 'destination_cidr_block = "0.0.0.0/0"')];
+  assert.ok(!ids(fs).includes('iac-security'));
+});
+
+test('matchRules: a bare 0.0.0.0/0 variable default without a network-rule signal does NOT fire iac-security', () => {
+  const fs = [added('infra/variables.tf', 'default = "0.0.0.0/0"')];
+  assert.ok(!ids(fs).includes('iac-security'));
+});
+
+test('matchRules: .phtml file gains sql-injection via the php language mapping', () => {
+  const fs = [added('templates/page.phtml', '$sql = "SELECT * FROM users WHERE id = " + $id;')];
+  assert.ok(ids(fs).includes('sql-injection'));
 });
