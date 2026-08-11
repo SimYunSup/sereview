@@ -143,11 +143,15 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all fourteen rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 14);
+test('RULEBOOK exposes all seventeen rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 17);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
-  const expected = ['sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1', 'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security', 'iac-security'];
+  const expected = [
+    'sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1',
+    'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security', 'iac-security',
+    'haskell-security', 'nim-security', 'nix-reproducibility',
+  ];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
 });
 
@@ -276,4 +280,100 @@ test('matchRules: a bare 0.0.0.0/0 variable default without a network-rule signa
 test('matchRules: .phtml file gains sql-injection via the php language mapping', () => {
   const fs = [added('templates/page.phtml', '$sql = "SELECT * FROM users WHERE id = " + $id;')];
   assert.ok(ids(fs).includes('sql-injection'));
+});
+
+test('detectLanguage: .hs / .lhs map to haskell', () => {
+  assert.equal(detectLanguage('src/Parser.hs'), 'haskell');
+  assert.equal(detectLanguage('docs/Tutorial.lhs'), 'haskell');
+});
+
+test('detectLanguage: .nim / .nims / .nimble map to nim', () => {
+  assert.equal(detectLanguage('src/parser.nim'), 'nim');
+  assert.equal(detectLanguage('config.nims'), 'nim');
+  assert.equal(detectLanguage('project.nimble'), 'nim');
+});
+
+test('detectLanguage: .nix maps to nix', () => {
+  assert.equal(detectLanguage('flake.nix'), 'nix');
+});
+
+test('matchRules: unsafePerformIO in a .hs file → haskell-security', () => {
+  const fs = [added('src/Cache.hs', 'x = unsafePerformIO (readIORef ref)')];
+  assert.ok(ids(fs).includes('haskell-security'));
+});
+
+test('matchRules: shell command execution in a .hs file → haskell-security', () => {
+  const fs = [added('src/Tool.hs', 'run = callCommand ("rm -rf " ++ userInput)')];
+  assert.ok(ids(fs).includes('haskell-security'));
+});
+
+test('matchRules: language gating — the same Haskell construct in a .py file does NOT fire haskell-security', () => {
+  const fs = [added('scripts/run.py', '# x = unsafePerformIO (readIORef ref)')];
+  assert.ok(!ids(fs).includes('haskell-security'));
+});
+
+test('matchRules: proc with an argument list, and a shellSort identifier, do NOT fire haskell-security', () => {
+  // `proc` passes arguments straight to the process (no shell), and `shellSort`
+  // is an ordinary identifier — neither is the `shell (...)`/`shell $ ...` call form.
+  const fs = [added('src/Tool.hs', 'run = readCreateProcess (proc "ls" ["-l"]) ""', 'shellSort xs = xs')];
+  assert.ok(!ids(fs).includes('haskell-security'));
+});
+
+test('matchRules: execShellCmd in a .nim file → nim-security', () => {
+  const fs = [added('src/tool.nim', 'let out = execShellCmd("rm -rf " & userInput)')];
+  assert.ok(ids(fs).includes('nim-security'));
+});
+
+test('matchRules: cast[] / unsafeAddr in a .nim file → nim-security', () => {
+  const fs = [added('src/mem.nim', 'let p = cast[pointer](unsafeAddr x)')];
+  assert.ok(ids(fs).includes('nim-security'));
+});
+
+test('matchRules: language gating — the same Nim construct in a .py file does NOT fire nim-security', () => {
+  const fs = [added('scripts/tool.py', '# let out = execShellCmd(cmd)')];
+  assert.ok(!ids(fs).includes('nim-security'));
+});
+
+test('matchRules: a bare addr on a local does NOT fire nim-security', () => {
+  const fs = [added('src/mem.nim', 'let p = addr x')];
+  assert.ok(!ids(fs).includes('nim-security'));
+});
+
+test('matchRules: an unpinned fetchTarball call in a .nix file → nix-reproducibility', () => {
+  const fs = [added('pkgs/default.nix', 'src = fetchTarball { url = "https://example.com/src.tar.gz"; };')];
+  assert.ok(ids(fs).includes('nix-reproducibility'));
+});
+
+test('matchRules: a <nixpkgs> channel import in a .nix file → nix-reproducibility', () => {
+  const fs = [added('shell.nix', 'let pkgs = import <nixpkgs> {};')];
+  assert.ok(ids(fs).includes('nix-reproducibility'));
+});
+
+test('matchRules: language gating — the same fetchTarball text in a .py file does NOT fire nix-reproducibility', () => {
+  const fs = [added('scripts/build.py', '# src = fetchTarball { url = "https://example.com/src.tar.gz"; };')];
+  assert.ok(!ids(fs).includes('nix-reproducibility'));
+});
+
+test('matchRules: a plain Nix expression without a fetcher or channel import does NOT fire nix-reproducibility', () => {
+  const fs = [added('pkgs/default.nix', 'let greeting = "hello"; in greeting')];
+  assert.ok(!ids(fs).includes('nix-reproducibility'));
+});
+
+test('matchRules: a fetcher pinned with rev/sha256 in the same added lines does NOT fire nix-reproducibility', () => {
+  const fs = [
+    added(
+      'pkgs/default.nix',
+      'src = fetchFromGitHub {',
+      '  owner = "o"; repo = "r";',
+      '  rev = "abc123";',
+      '  sha256 = "sha256-AAAA";',
+      '};',
+    ),
+  ];
+  assert.ok(!ids(fs).includes('nix-reproducibility'));
+});
+
+test('matchRules: a fetcher URL bump without a matching hash update → nix-reproducibility', () => {
+  const fs = [added('pkgs/default.nix', 'url = "https://example.com/v2.tar.gz"; src = fetchurl {')];
+  assert.ok(ids(fs).includes('nix-reproducibility'));
 });

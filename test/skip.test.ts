@@ -51,7 +51,20 @@ test('defaultSkip: generated-code files (.generated.*, .gen.go, .pb.{go,cc,h})',
 });
 
 test('defaultSkip: test files', () => {
-  for (const p of ['src/__tests__/a.ts', 'src/a.test.ts', 'src/a.spec.tsx', 'pkg/foo_test.go', 'src/FooTest.java', 'app/BarTest.kt', 'test/runtests.jl', 'pkg/test/unit/solver.jl']) {
+  for (const p of [
+    'src/__tests__/a.ts',
+    'src/a.test.ts',
+    'src/a.spec.tsx',
+    'pkg/foo_test.go',
+    'src/FooTest.java',
+    'app/BarTest.kt',
+    'test/runtests.jl',
+    'pkg/test/unit/solver.jl',
+    'test/Unit/Parser.hs',
+    'src/ParserSpec.hs',
+    'test/Doc.lhs',
+    'tests/t_parser.nim',
+  ]) {
     assert.equal(defaultSkip(file(p)), 'test', p);
   }
 });
@@ -65,6 +78,12 @@ test('defaultSkip: normal source / docs files are kept', () => {
     'src/components/Button.tsx',
     'src/solver.jl',
     'src/latest/model.jl',
+    'src/Parser.hs',
+    'src/parser.nim',
+    'flake.nix',
+    // Nim's default exclude only mirrors the plural `tests/` directory — a
+    // singular `test/` (as Julia uses) is intentionally NOT matched for Nim.
+    'test/helper.nim',
     // Basenames that merely contain 'testdata'/'fixtures'/'generated'/'gen'/'pb'
     // as a word, not a directory segment or the exact suffix pattern.
     'src/testdata.go',
