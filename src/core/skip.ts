@@ -59,7 +59,12 @@ export function defaultSkip(f: ChangedFile): string | null {
     /\.(test|spec)\.(jsx?|tsx?|mjs|cjs)$/.test(path) ||
     /_test\.go$/.test(path) ||
     /(^|\/)\w+Test\.(java|kt)$/.test(path) ||
-    /(^|\/)test\/.*\.jl$/.test(path)
+    /(^|\/)test\/.*\.jl$/.test(path) ||
+    /(^|\/)test\/.*\.l?hs$/.test(path) ||
+    /Spec\.l?hs$/.test(path) ||
+    // Nim's default exclude set uses the plural `tests/` directory (unlike
+    // Julia's singular `test/` above) — mirrored as-is, not normalized.
+    /(^|\/)tests\/.*\.nim$/.test(path)
   ) {
     return 'test';
   }

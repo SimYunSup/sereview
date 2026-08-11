@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-7 (2026-08-04)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-8 (2026-08-12)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,7 +23,7 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of fourteen heuristics. Each `matches`
+ * The starter rulebook: a security-leaning set of seventeen heuristics. Each `matches`
  * is intentionally conservative — it flags *candidates* so the host Claude Code
  * session knows where to look; it never decides that a finding is real.
  */
@@ -232,6 +232,58 @@ export const RULEBOOK: RuleDefinition[] = [
         /public_network_access_enabled\s*=\s*true/i.test(c.addedText) ||
         /sourceAddressPrefix['"\s:=]+'?"?(\*|Internet)/i.test(c.addedText)
       );
+    },
+  },
+  {
+    id: 'haskell-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Security-sensitive Haskell construct',
+    guidance:
+      'A Haskell construct that is only safe under documented invariants. Check that: `unsafePerformIO`\'s result does not depend on mutable state or evaluation order and carries a `{-# NOINLINE #-}` pragma (or another documented reason) so GHC cannot float or duplicate it; `unsafeCoerce` preserves the runtime representation of both types; a shell invocation (`callCommand`, `spawnCommand`, `runCommand`, or `shell` from `System.Process`) never interpolates external input — prefer `proc` with an explicit argument list, which reaches the process directly without a shell; and a `foreign import` validates pointer lifetime, null-ness, buffer length and encoding at the FFI boundary.',
+    appliesTo: ['security', 'haskell'],
+    matches: (c) =>
+      /\bunsafe(PerformIO|Coerce|InterleaveIO|IOToSTM)\b/.test(c.addedText) ||
+      // narrowed to function-application position (`shell (...)` / `shell $ ...`)
+      // so a plain identifier like `shellSort` doesn't false-positive
+      /\bcallCommand\b|\bspawnCommand\b|\brunCommand\b|\bshell\s*[($]/.test(c.addedText) ||
+      /\bforeign\s+import\b/.test(c.addedText),
+  },
+  {
+    id: 'nim-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Security-sensitive Nim construct',
+    guidance:
+      'A Nim construct that crosses a trust or memory-safety boundary. Check that: external input never reaches `execShellCmd`, a shell command, a SQL statement, or a filesystem path without validation; `cast[]`/`unsafeAddr` preserve type, alignment, bounds and lifetime invariants (a plain `addr` on a local is common and not itself a signal); an `{.importc.}`/`{.exportc.}`/`{.dynlib.}` FFI declaration matches the callee\'s calling convention, null-ness, buffer length and ownership; `staticExec`/`gorge` never execute untrusted text at compile time; and input is not validated only via `assert`, which release builds compile out.',
+    appliesTo: ['security', 'nim'],
+    matches: (c) =>
+      /\bexecShellCmd\b|\bstaticExec\b|\bgorge\b/.test(c.addedText) ||
+      /\bcast\[/.test(c.addedText) ||
+      // unsafeAddr only — a bare `addr` on a local is routine Nim and not a signal
+      /\bunsafeAddr\b/.test(c.addedText) ||
+      /\{\.\s*(importc|exportc|dynlib)\b/.test(c.addedText),
+  },
+  {
+    id: 'nix-reproducibility',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'Nix fetcher / channel pinning',
+    guidance:
+      'A Nix fetcher or channel import that affects build reproducibility. Check that a fetcher (`fetchTarball`, `fetchGit`, `fetchurl`, `fetchFromGitHub`, or a `builtins.fetch*` call) is pinned to a fixed `rev` and content hash rather than a mutable branch/ref; that a version bump updates the `rev`/hash together rather than leaving a stale hash; and that pinned (flake/lockfile) code does not newly pull in a mutable `<nixpkgs>`/channel import. The rule stays quiet when the added lines already carry a `rev`/hash pin alongside the fetcher.',
+    appliesTo: ['correctness', 'nix'],
+    matches: (c) => {
+      if (/<nixpkgs>/.test(c.addedText)) return true;
+      const hasFetcher =
+        /\b(fetchTarball|fetchGit|fetchurl|fetchFromGitHub)\s*[({]/.test(c.addedText) ||
+        /builtins\.fetch\w+/.test(c.addedText);
+      if (!hasFetcher) return false;
+      // A fetcher paired with a rev/hash attr in the same added lines is the
+      // pinned, reproducible shape upstream's nix.md asks for — stay quiet.
+      // No pin token alongside the fetcher means either an unpinned source or
+      // a URL/version bump that left the hash stale, so flag it either way.
+      const hasPinToken = /\b(sha256|sha512|hash|narHash|outputHash|rev)\s*=/.test(c.addedText);
+      return !hasPinToken;
     },
   },
 ];

@@ -72,6 +72,35 @@ to [Semantic Versioning](https://semver.org/).
   sereview's diff parser already treats any unrecognized extended-header line —
   including `index `/`similarity index ` — as opaque and skips it, so no
   parser change was needed.)
+- **Haskell, Nim & Nix support (rulebook v8):** `.hs`/`.lhs` map to a new
+  `haskell` language, `.nim`/`.nims`/`.nimble` to a new `nim` language, and
+  `.nix` to a new `nix` language; Haskell's `test/**/*.{hs,lhs}` and
+  `**/*Spec.{hs,lhs}` and Nim's `tests/**/*.nim` (plural, unlike Julia's
+  singular `test/`) join the default skip filter; and three rules cover the
+  new languages' security-sensitive constructs — `haskell-security` flags
+  `unsafePerformIO`/`unsafeCoerce`/`unsafeInterleaveIO`/`unsafeIOToSTM`, a
+  `callCommand`/`spawnCommand`/`runCommand`/`shell` process invocation (a
+  `proc` call with an explicit argument list is not flagged), and a `foreign
+  import`; `nim-security` flags `execShellCmd`/`staticExec`/`gorge`,
+  `cast[]`/`unsafeAddr` (a bare `addr` is not flagged), and an
+  `importc`/`exportc`/`dynlib` FFI pragma; `nix-reproducibility` flags a
+  `fetchTarball`/`fetchGit`/`fetchurl`/`fetchFromGitHub`/`builtins.fetch*`
+  call (fires only when the added lines carry no `rev`/hash pin — an
+  unpinned source, or a source change without the matching hash update)
+  and a mutable `<nixpkgs>` channel import. Derived from upstream
+  open-code-review v1.8.6…v1.9.0's new `haskell.md`/`nim.md`/`nix.md` rule
+  docs plus its allowlist/exclude-pattern expansion. (Upstream's Haskell
+  totality/laziness guidance, Nim style conventions, and Nix module/overlay
+  guidance were reviewed and intentionally not adopted — like `go.md`/
+  `php.md` before them, they are agent review instructions that presuppose
+  `file_read` verification, not a deterministic `matches` heuristic. The
+  upstream scan-side changes — resume checkpoints, a preview-session fix, and
+  `retry_codes`/provider-preset additions — are out of scope: sereview has no
+  model-calling agent, so that surface doesn't exist here. A per-file token
+  limit knob is already covered by sereview's existing `--max-bundle-tokens`.
+  The `internal/diff/` changes in this range are an SPDX license-header
+  addition only, with no parser behavior change, so no diff-parser change was
+  needed.)
 
 ### Changed
 
