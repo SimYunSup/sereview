@@ -64,7 +64,12 @@ export function defaultSkip(f: ChangedFile): string | null {
     /Spec\.l?hs$/.test(path) ||
     // Nim's default exclude set uses the plural `tests/` directory (unlike
     // Julia's singular `test/` above) — mirrored as-is, not normalized.
-    /(^|\/)tests\/.*\.nim$/.test(path)
+    /(^|\/)tests\/.*\.nim$/.test(path) ||
+    // Swift's default exclude set is `**/*Test.swift`, `**/*Tests.swift` and
+    // `**/Tests/**/*.swift` — the directory form is matched case-insensitively
+    // upstream, so both `Tests/` and `tests/` count.
+    /(^|\/)\w*Tests?\.swift$/.test(path) ||
+    /(^|\/)[Tt]ests\/.*\.swift$/.test(path)
   ) {
     return 'test';
   }

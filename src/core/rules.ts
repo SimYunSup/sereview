@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-8 (2026-08-12)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-9 (2026-08-22)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,7 +23,7 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of seventeen heuristics. Each `matches`
+ * The starter rulebook: a security-leaning set of twenty heuristics. Each `matches`
  * is intentionally conservative — it flags *candidates* so the host Claude Code
  * session knows where to look; it never decides that a finding is real.
  */
@@ -285,6 +285,54 @@ export const RULEBOOK: RuleDefinition[] = [
       const hasPinToken = /\b(sha256|sha512|hash|narHash|outputHash|rev)\s*=/.test(c.addedText);
       return !hasPinToken;
     },
+  },
+  {
+    id: 'swift-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Security-sensitive Swift construct',
+    guidance:
+      'A Swift construct that crosses a memory-safety or trust boundary. Check that: an `Unsafe*Pointer` / `withUnsafeBytes`-style region has guaranteed lifetime, alignment and bounds, and that the pointer never escapes the closure it was formed in; `unsafeBitCast`/`unsafeDowncast` preserve the runtime representation and dynamic type (a conditional `as?` is the checked alternative); a `WKWebView` JavaScript bridge (`WKUserContentController.add`, a `WKScriptMessageHandler`, or `evaluateJavaScript`) validates every message body, never interpolates untrusted text into evaluated JavaScript, and allowlists URL schemes/hosts before navigating; and that transport protections stay intact — `NSAllowsArbitraryLoads` disables App Transport Security, and answering an authentication challenge with `URLCredential(trust:)`/`serverTrust` accepts the presented certificate chain without validating it.',
+    appliesTo: ['security', 'swift'],
+    matches: (c) =>
+      /\bUnsafe(Mutable)?(Raw)?(Buffer)?Pointer\b|\bwithUnsafe\w*(Bytes|Pointer)\s*[({]/.test(c.addedText) ||
+      /\bunsafeBitCast\s*\(|\bunsafeDowncast\s*\(/.test(c.addedText) ||
+      /\bWKScriptMessageHandler\b|\bWKUserContentController\b|\bevaluateJavaScript\s*\(/.test(c.addedText) ||
+      /\bNSAllowsArbitraryLoads\b/.test(c.addedText) ||
+      /\bURLCredential\s*\(\s*trust\s*:|\.serverTrust\b/.test(c.addedText),
+  },
+  {
+    id: 'swift-concurrency',
+    category: 'concurrency',
+    severityHint: 'high',
+    title: 'Swift concurrency isolation escape hatch',
+    guidance:
+      'A Swift concurrency construct that opts out of — or can outlive — the compiler-checked isolation model. Check that: an `@unchecked Sendable` conformance or a `nonisolated(unsafe)` declaration is backed by a real synchronization invariant (a lock, a serial queue, or immutability) rather than a silenced diagnostic; a `Task.detached` is deliberate, since it inherits neither actor context nor priority nor cancellation, and any isolated state it touches needs an explicit hop; a `withUnsafeContinuation`/`withUnsafeThrowingContinuation` resumes exactly once on every path including error and cancellation (the `Checked` variants trap on misuse and are the safer default); and a `DispatchSemaphore` — or any synchronous wait — is never blocked on across an `await`, which can deadlock the cooperative thread pool.',
+    appliesTo: ['concurrency', 'swift'],
+    matches: (c) =>
+      /@unchecked\s+Sendable\b/.test(c.addedText) ||
+      /\bnonisolated\s*\(\s*unsafe\s*\)/.test(c.addedText) ||
+      /\bTask\.detached\b/.test(c.addedText) ||
+      /\bwithUnsafe(Throwing)?Continuation\s*[({]/.test(c.addedText) ||
+      /\bDispatchSemaphore\b/.test(c.addedText),
+  },
+  {
+    id: 'swift-runtime-safety',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'Swift trap-on-failure / unowned lifetime risk',
+    guidance:
+      'A Swift construct that turns a recoverable failure into a runtime crash. Check that: `try!` cannot actually throw on the paths it is reachable from — decoding, networking, persistence and filesystem calls can, so propagate with `try`/`Result` instead of trapping; a force cast (`as!`) of a deserialized value (JSON, property list, `UserDefaults`, archived data) is written as `as?` with a failure path, since a schema or server change otherwise turns it into a crash; and an `[unowned]` capture is guaranteed to outlive the closure that reads it — `[weak]` with an explicit nil path is the safe default whenever the owner can be deallocated first (a cancelled task, a dismissed view, a delegate outliving its owner).',
+    appliesTo: ['correctness', 'swift'],
+    matches: (c) =>
+      /\btry!/.test(c.addedText) ||
+      /\[\s*unowned\b/.test(c.addedText) ||
+      // Line-scoped: a force cast of a *deserialized* value. An ordinary `as!`
+      // downcast (a dequeued cell, a storyboard-instantiated controller) is
+      // routine Swift and not a signal on its own.
+      /^.*\b(JSONSerialization|jsonObject|JSONDecoder|PropertyListSerialization|NSKeyedUnarchiver|UserDefaults)\b.*\bas!\s/m.test(
+        c.addedText,
+      ),
   },
 ];
 

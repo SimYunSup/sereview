@@ -143,14 +143,15 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all seventeen rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 17);
+test('RULEBOOK exposes all twenty rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 20);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
   const expected = [
     'sql-injection', 'xss', 'ssrf', 'path-traversal', 'secret-exposure', 'authz', 'npe', 'race', 'n-plus-1',
     'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security', 'iac-security',
     'haskell-security', 'nim-security', 'nix-reproducibility',
+    'swift-security', 'swift-concurrency', 'swift-runtime-safety',
   ];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
 });
@@ -376,4 +377,97 @@ test('matchRules: a fetcher pinned with rev/sha256 in the same added lines does 
 test('matchRules: a fetcher URL bump without a matching hash update → nix-reproducibility', () => {
   const fs = [added('pkgs/default.nix', 'url = "https://example.com/v2.tar.gz"; src = fetchurl {')];
   assert.ok(ids(fs).includes('nix-reproducibility'));
+});
+
+test('detectLanguage: .swift maps to swift', () => {
+  assert.equal(detectLanguage('Sources/App/User.swift'), 'swift');
+});
+
+test('matchRules: an UnsafeMutableBufferPointer region in a .swift file → swift-security', () => {
+  const fs = [added('Sources/App/Bytes.swift', 'let buf = UnsafeMutableBufferPointer<UInt8>(start: p, count: n)')];
+  assert.ok(ids(fs).includes('swift-security'));
+});
+
+test('matchRules: a WKWebView JavaScript bridge in a .swift file → swift-security', () => {
+  const fs = [added('Sources/App/Web.swift', 'webView.evaluateJavaScript("show(\\(payload))")')];
+  assert.ok(ids(fs).includes('swift-security'));
+});
+
+test('matchRules: a server-trust credential in a .swift file → swift-security', () => {
+  const fs = [added('Sources/App/Net.swift', 'completionHandler(.useCredential, URLCredential(trust: challenge.protectionSpace.serverTrust!))')];
+  assert.ok(ids(fs).includes('swift-security'));
+});
+
+test('matchRules: language gating — the same Swift construct in a .py file does NOT fire swift-security', () => {
+  const fs = [added('scripts/tool.py', '# buf = UnsafeMutableBufferPointer(start: p, count: n)')];
+  assert.ok(!ids(fs).includes('swift-security'));
+});
+
+test('matchRules: a checked cast and an ordinary URLSession call do NOT fire swift-security', () => {
+  const fs = [
+    added(
+      'Sources/App/Net.swift',
+      'let cell = view.dequeueReusableCell(withIdentifier: "row") as? RowCell',
+      'let (data, _) = try await URLSession.shared.data(from: url)',
+    ),
+  ];
+  assert.ok(!ids(fs).includes('swift-security'));
+});
+
+test('matchRules: @unchecked Sendable in a .swift file → swift-concurrency', () => {
+  const fs = [added('Sources/App/Cache.swift', 'final class Cache: @unchecked Sendable {')];
+  const rule = matchRules(fs).find((r) => r.id === 'swift-concurrency');
+  assert.ok(rule, 'swift-concurrency should match');
+  assert.equal(rule!.category, 'concurrency');
+});
+
+test('matchRules: nonisolated(unsafe) / Task.detached / an unsafe continuation → swift-concurrency', () => {
+  for (const line of [
+    'nonisolated(unsafe) static var shared: Cache?',
+    'Task.detached { await refresh() }',
+    'await withUnsafeContinuation { c in load(c) }',
+    'let sem = DispatchSemaphore(value: 0)',
+  ]) {
+    assert.ok(ids([added('Sources/App/Job.swift', line)]).includes('swift-concurrency'), line);
+  }
+});
+
+test('matchRules: an actor with a checked continuation does NOT fire swift-concurrency', () => {
+  const fs = [
+    added(
+      'Sources/App/Job.swift',
+      'actor Loader {',
+      '  func load() async -> Data { await withCheckedContinuation { c in fetch(c) } }',
+      '}',
+    ),
+  ];
+  assert.ok(!ids(fs).includes('swift-concurrency'));
+});
+
+test('matchRules: try! and an [unowned self] capture in a .swift file → swift-runtime-safety', () => {
+  const fs = [added('Sources/App/Store.swift', 'let model = try! JSONDecoder().decode(Model.self, from: data)')];
+  assert.ok(ids(fs).includes('swift-runtime-safety'));
+  assert.ok(ids([added('Sources/App/Store.swift', 'task = Task { [unowned self] in await self.refresh() }')]).includes(
+    'swift-runtime-safety',
+  ));
+});
+
+test('matchRules: a force cast of a deserialized value → swift-runtime-safety', () => {
+  const fs = [
+    added('Sources/App/Store.swift', 'let dict = try JSONSerialization.jsonObject(with: data) as! [String: Any]'),
+  ];
+  assert.ok(ids(fs).includes('swift-runtime-safety'));
+});
+
+test('matchRules: an ordinary as! downcast and a retry! -free throwing call do NOT fire swift-runtime-safety', () => {
+  const fs = [
+    added(
+      'Sources/App/View.swift',
+      'let cell = tableView.dequeueReusableCell(withIdentifier: "row", for: indexPath) as! RowCell',
+      'let model = try decoder.decode(Model.self, from: data)',
+      'retry!(request)',
+      'task = Task { [weak self] in await self?.refresh() }',
+    ),
+  ];
+  assert.ok(!ids(fs).includes('swift-runtime-safety'));
 });

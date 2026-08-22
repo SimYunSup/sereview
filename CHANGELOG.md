@@ -101,6 +101,40 @@ to [Semantic Versioning](https://semver.org/).
   The `internal/diff/` changes in this range are an SPDX license-header
   addition only, with no parser behavior change, so no diff-parser change was
   needed.)
+- **Swift support in the rulebook (rulebook v9):** Swift's default exclude set
+  (`**/*Test.swift`, `**/*Tests.swift`, `**/Tests/**/*.swift` — the directory
+  form matched case-insensitively, as upstream does) joins the default skip
+  filter, and three rules cover the language's deterministic defect signals:
+  `swift-security` flags an `Unsafe*Pointer`/`withUnsafe*` region,
+  `unsafeBitCast`/`unsafeDowncast`, a `WKWebView` JavaScript bridge
+  (`WKUserContentController`/`WKScriptMessageHandler`/`evaluateJavaScript`),
+  `NSAllowsArbitraryLoads`, and a `URLCredential(trust:)`/`serverTrust`
+  certificate-validation bypass; `swift-concurrency` flags the isolation
+  escape hatches — `@unchecked Sendable`, `nonisolated(unsafe)`,
+  `Task.detached`, `withUnsafe(Throwing)Continuation` (the `Checked` variants
+  are not flagged), and a `DispatchSemaphore` that can be waited on across an
+  `await`; `swift-runtime-safety` flags `try!`, an `[unowned]` capture, and a
+  force cast (`as!`) of a deserialized value on the same line as its
+  `JSONSerialization`/`JSONDecoder`/`NSKeyedUnarchiver`/`UserDefaults` source
+  (an ordinary `as!` downcast, e.g. a dequeued cell, is not flagged). `.swift`
+  already mapped to the `swift` language, so no diff-parser change was needed.
+  Derived from upstream open-code-review v1.9.0…v1.9.5's new `swift.md` rule
+  doc plus its exclude-pattern expansion. (Upstream's SwiftUI state/lifecycle,
+  SwiftData/Core Data, HealthKit, StoreKit-entitlement, Combine-scheduler and
+  testing guidance was reviewed and intentionally not adopted: each needs
+  ownership, lifecycle or call-site verification via `file_read`, which is
+  `skill/SKILL.md`'s job, not a deterministic `matches` heuristic. Force
+  unwrap `!` on its own is likewise not flagged — upstream scopes it to
+  runtime-derived values, and an unscoped `!` would fire on almost every Swift
+  diff. Upstream's `IsUserExcluded`/`IsUserIncluded` case-insensitivity fix and
+  its gitignore directory-pattern fix have no counterpart here: sereview's skip
+  filter is a predicate with no user glob patterns, and it consumes a diff
+  rather than walking a work tree. The rest of the range — SARIF output, LLM
+  retry identity/reporting, session resume, the `budget_exceeded` scan summary
+  flag, and the `kimi-global` provider — is model-calling agent surface that
+  does not exist in sereview; `internal/diff/`'s cross-file comment relocation
+  is comment placement for that agent's output, which the host Claude Code
+  session does here.)
 
 ### Changed
 
