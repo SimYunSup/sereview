@@ -64,6 +64,11 @@ test('defaultSkip: test files', () => {
     'src/ParserSpec.hs',
     'test/Doc.lhs',
     'tests/t_parser.nim',
+    'MyAppTests/UserTests.swift',
+    'MyAppTests/UserTest.swift',
+    'MyAppUITests/LaunchTests.swift',
+    'Tests/AppTests/Mocks/MockService.swift',
+    'tests/AppTests/Helpers/Helper.swift',
   ]) {
     assert.equal(defaultSkip(file(p)), 'test', p);
   }
@@ -81,6 +86,13 @@ test('defaultSkip: normal source / docs files are kept', () => {
     'src/Parser.hs',
     'src/parser.nim',
     'flake.nix',
+    'Sources/App/User.swift',
+    // A basename that merely starts with 'Test' is not the `*Test(s).swift`
+    // suffix Swift's default exclude set matches.
+    'Sources/App/TestSupport.swift',
+    // Lowercase 'latest.swift' must not read as a '*test.swift' suffix — the
+    // filename form is matched case-sensitively, unlike the directory form.
+    'Sources/App/latest.swift',
     // Nim's default exclude only mirrors the plural `tests/` directory — a
     // singular `test/` (as Julia uses) is intentionally NOT matched for Nim.
     'test/helper.nim',

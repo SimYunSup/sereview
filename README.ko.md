@@ -100,7 +100,7 @@ sereview --version
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-8 (2026-08-12)"
+  "rulebookVersion": "sereview-rulebook-9 (2026-08-22)"
 }
 ```
 
@@ -174,6 +174,9 @@ console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 | `haskell-security` | security | high |
 | `nim-security` | security | high |
 | `nix-reproducibility` | correctness | medium |
+| `swift-security` | security | high |
+| `swift-concurrency` | concurrency | high |
+| `swift-runtime-safety` | correctness | medium |
 
 심각도 단계: `critical · high · medium · low · info`.
 
