@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { BundledFile, DiffLine } from '../src/core/types.ts';
-import { detectLanguage } from '../src/core/diff.ts';
+import { detectLanguage, parseDiff } from '../src/core/diff.ts';
 import { matchRules, RULEBOOK, RULEBOOK_VERSION } from '../src/core/rules.ts';
 
 /** Build a BundledFile consisting solely of the given added lines. */
@@ -143,8 +143,8 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all twenty rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 20);
+test('RULEBOOK exposes all twenty-seven rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 27);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
   const expected = [
@@ -152,6 +152,8 @@ test('RULEBOOK exposes all twenty rules and a version string', () => {
     'github-actions-security', 'template-injection', 'rust-macro-correctness', 'julia-security', 'iac-security',
     'haskell-security', 'nim-security', 'nix-reproducibility',
     'swift-security', 'swift-concurrency', 'swift-runtime-safety',
+    'elm-production-safety', 'jsonnet-external-input', 'zig-safety', 'r-runtime-safety', 'matlab-dynamic-code',
+    'objective-c-runtime-safety', 'smart-contract-security',
   ];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
 });
@@ -470,4 +472,66 @@ test('matchRules: an ordinary as! downcast and a retry! -free throwing call do N
     ),
   ];
   assert.ok(!ids(fs).includes('swift-runtime-safety'));
+});
+
+test('detectLanguage: upstream v1.10/v1.11 extensions map to rulebook languages', () => {
+  const cases = [
+    ['src/App.elm', 'elm'],
+    ['config/main.jsonnet', 'jsonnet'],
+    ['vendor/lib.libsonnet', 'jsonnet'],
+    ['src/main.zig', 'zig'],
+    ['analysis/model.R', 'r'],
+    ['analysis/notebook.ipynb', 'python'],
+    ['api/service.thrift', 'thrift'],
+    ['api/service.capnp', 'capnp'],
+    ['templates/view.hbs', 'handlebars'],
+    ['templates/view.mustache', 'handlebars'],
+    ['contracts/Vault.sol', 'solidity'],
+    ['contracts/Vault.vy', 'vyper'],
+    ['config/application.properties', 'properties'],
+    ['locale/messages.po', 'gettext'],
+    ['locale/messages.pot', 'gettext'],
+    ['ios/ViewController.m', 'objective-c'],
+  ] as const;
+
+  for (const [path, language] of cases) {
+    assert.equal(detectLanguage(path), language, path);
+  }
+});
+
+test('matchRules: Handlebars/Mustache raw output and dynamic partials are gated separately', () => {
+  assert.ok(ids([added('templates/profile.hbs', '<article>{{{profile.bio}}}</article>')]).includes('xss'));
+  assert.ok(!ids([added('templates/profile.hbs', '<p>{{profile.name}}</p>')]).includes('xss'));
+  assert.ok(
+    ids([added('templates/profile.mustache', '{{>*partialName}}')]).includes('template-injection'),
+  );
+});
+
+test('matchRules: newly supported language boundaries receive their rulebook hints', () => {
+  const cases = [
+    ['src/App.elm', 'view = Debug.todo "replace me"', 'elm-production-safety'],
+    ['config/main.jsonnet', "local region = std.extVar('region');", 'jsonnet-external-input'],
+    ['src/ffi.zig', 'const value = @ptrCast(raw);', 'zig-safety'],
+    ['analysis/report.R', 'result <- eval(parse(text = input))', 'r-runtime-safety'],
+    ['ios/Decoder.m', '[decoder performSelector:selector];', 'objective-c-runtime-safety'],
+    ['contracts/Vault.sol', 'require(tx.origin == owner);', 'smart-contract-security'],
+    ['contracts/vault.vy', 'result: Bytes[32] = raw_call(target, data)', 'smart-contract-security'],
+  ] as const;
+
+  for (const [path, line, rule] of cases) {
+    assert.ok(ids([added(path, line)]).includes(rule), `${path} should match ${rule}`);
+  }
+});
+
+test('matchRules: MATLAB syntax in an .m diff enables MATLAB dynamic-code review', () => {
+  const files = parseDiff(`diff --git a/analysis/evaluate.m b/analysis/evaluate.m
+new file mode 100644
+--- /dev/null
++++ b/analysis/evaluate.m
+@@ -0,0 +1,2 @@
++function result = evaluate(expression)
++result = eval(expression);
+`);
+  assert.equal(files[0]!.file.language, 'matlab');
+  assert.ok(ids(files).includes('matlab-dynamic-code'));
 });

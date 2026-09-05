@@ -228,7 +228,8 @@
             "java",
             "go",
             "php",
-            "ruby"
+            "ruby",
+            "r"
           ],
           "matchedPaths": [
             "src/db.ts"
@@ -239,7 +240,7 @@
           "category": "security",
           "severityHint": "high",
           "title": "Possible XSS via an unescaped HTML sink",
-          "guidance": "Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Confirm the value is escaped/sanitized, or rendered as text rather than HTML.",
+          "guidance": "Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Raw Handlebars/Mustache interpolation (`{{{...}}}` / `{{& ...}}`) also bypasses the engines’ default HTML escaping. Confirm the value is escaped/sanitized for its output context, or rendered as text rather than HTML.",
           "appliesTo": [
             "frontend",
             "javascript",
@@ -247,7 +248,8 @@
             "html",
             "vue",
             "svelte",
-            "astro"
+            "astro",
+            "handlebars"
           ],
           "matchedPaths": [
             "web/view.tsx"
@@ -296,5 +298,5 @@
     "deletions": 2,
     "bundles": 1
   },
-  "rulebookVersion": "sereview-rulebook-9 (2026-08-22)"
+  "rulebookVersion": "sereview-rulebook-10 (2026-09-05)"
 }

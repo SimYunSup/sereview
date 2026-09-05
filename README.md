@@ -103,7 +103,7 @@ data — the review happens when a Claude Code session consumes it via the
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-9 (2026-08-22)"
+  "rulebookVersion": "sereview-rulebook-10 (2026-09-05)"
 }
 ```
 
@@ -181,6 +181,13 @@ A security-leaning starter set, used as **hints** for the reviewer:
 | `swift-security` | security | high |
 | `swift-concurrency` | concurrency | high |
 | `swift-runtime-safety` | correctness | medium |
+| `elm-production-safety` | correctness | high |
+| `jsonnet-external-input` | correctness | medium |
+| `zig-safety` | security | high |
+| `r-runtime-safety` | security | high |
+| `matlab-dynamic-code` | security | high |
+| `objective-c-runtime-safety` | security | high |
+| `smart-contract-security` | security | high |
 
 Severity scale: `critical · high · medium · low · info`.
 

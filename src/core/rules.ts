@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-9 (2026-08-22)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-10 (2026-09-05)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,7 +23,7 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of twenty heuristics. Each `matches`
+ * The starter rulebook: a security-leaning set of twenty-seven heuristics. Each `matches`
  * is intentionally conservative — it flags *candidates* so the host Claude Code
  * session knows where to look; it never decides that a finding is real.
  */
@@ -35,7 +35,7 @@ export const RULEBOOK: RuleDefinition[] = [
     title: 'SQL injection via string-built query',
     guidance:
       'A SQL statement appears to be assembled with string concatenation or interpolation. Check whether any interpolated value can originate from user input; if so, require parameterized queries / prepared statements instead of building SQL by hand.',
-    appliesTo: ['backend', 'database', 'javascript', 'typescript', 'python', 'java', 'go', 'php', 'ruby'],
+    appliesTo: ['backend', 'database', 'javascript', 'typescript', 'python', 'java', 'go', 'php', 'ruby', 'r'],
     matches: (c) =>
       /\b(select\s+.+\s+from|insert\s+into|update\s+.+\s+set|delete\s+from)\b/i.test(c.addedText) &&
       /(\$\{|['"]\s*\+|\+\s*['"]|%s|f["'])/.test(c.addedText),
@@ -46,10 +46,10 @@ export const RULEBOOK: RuleDefinition[] = [
     severityHint: 'high',
     title: 'Possible XSS via an unescaped HTML sink',
     guidance:
-      'Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Confirm the value is escaped/sanitized, or rendered as text rather than HTML.',
-    appliesTo: ['frontend', 'javascript', 'typescript', 'html', 'vue', 'svelte', 'astro'],
+      'Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Raw Handlebars/Mustache interpolation (`{{{...}}}` / `{{& ...}}`) also bypasses the engines’ default HTML escaping. Confirm the value is escaped/sanitized for its output context, or rendered as text rather than HTML.',
+    appliesTo: ['frontend', 'javascript', 'typescript', 'html', 'vue', 'svelte', 'astro', 'handlebars'],
     matches: (c) =>
-      /\b(innerhtml|outerhtml|dangerouslysetinnerhtml|insertadjacenthtml|document\.write|v-html)\b|\bset:html\b|\beval\s*\(/i.test(
+      /\b(innerhtml|outerhtml|dangerouslysetinnerhtml|insertadjacenthtml|document\.write|v-html)\b|\bset:html\b|\beval\s*\(|\{\{\{\s*[^}]+\}\}\}|\{\{&\s*[^}]+\}\}/i.test(
         c.addedText,
       ),
   },
@@ -175,15 +175,16 @@ export const RULEBOOK: RuleDefinition[] = [
     severityHint: 'high',
     title: 'Possible server-side template injection (SSTI)',
     guidance:
-      'FreeMarker builtins that reach into the JVM (?new, ?eval, ?api) or classes like freemarker.template.utility.Execute / ObjectConstructor let a template execute arbitrary code or shell commands, and a dynamically built <#include>/<#import> target lets an attacker choose the template to render. Verify template names/bodies never derive from request input and that a restricted TemplateClassResolver is configured; also treat ?no_esc / <#noautoesc> on user-controlled data as an escaping escape-hatch worth double-checking.',
-    appliesTo: ['security', 'freemarker', 'java'],
+      'FreeMarker builtins that reach into the JVM (?new, ?eval, ?api) or classes like freemarker.template.utility.Execute / ObjectConstructor let a template execute arbitrary code or shell commands, and a dynamically built <#include>/<#import> target lets an attacker choose the template to render. Handlebars/Mustache dynamic partial names have the same template-selection boundary. Verify template names/bodies never derive from request input without an allowlist; also treat ?no_esc / <#noautoesc> on user-controlled data as an escaping escape-hatch worth double-checking.',
+    appliesTo: ['security', 'freemarker', 'java', 'handlebars'],
     matches: (c) =>
       /\?\s*new\s*\(/.test(c.addedText) ||
       /\?eval\b/i.test(c.addedText) ||
       /\?api\b/i.test(c.addedText) ||
       /freemarker\.template\.utility\.Execute|ObjectConstructor/.test(c.addedText) ||
       /<#(include|import)[^\n]*\$\{/.test(c.addedText) ||
-      /\?no_esc\b|<#noautoesc/i.test(c.addedText),
+      /\?no_esc\b|<#noautoesc/i.test(c.addedText) ||
+      /\{\{>\s*\(\s*lookup\b|\{\{>\s*\*[A-Za-z0-9_.-]+/.test(c.addedText),
   },
   {
     id: 'rust-macro-correctness',
@@ -333,6 +334,90 @@ export const RULEBOOK: RuleDefinition[] = [
       /^.*\b(JSONSerialization|jsonObject|JSONDecoder|PropertyListSerialization|NSKeyedUnarchiver|UserDefaults)\b.*\bas!\s/m.test(
         c.addedText,
       ),
+  },
+  {
+    id: 'elm-production-safety',
+    category: 'correctness',
+    severityHint: 'high',
+    title: 'Elm debug artifact blocks optimized production build',
+    guidance:
+      '`Debug.log`, `Debug.todo`, and `Debug.toString` prevent `elm make --optimize` from producing a production build. Remove the debug call or replace a reachable failure with an explicit Result / view state.',
+    appliesTo: ['correctness', 'elm'],
+    matches: (c) => /\bDebug\.(log|todo|toString)\b/.test(c.addedText),
+  },
+  {
+    id: 'jsonnet-external-input',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'Jsonnet external configuration input',
+    guidance:
+      '`std.extVar` / `std.extCode` introduce values whose type and presence are not visible in the Jsonnet file. Check that the value has a documented default or validation, and parse string inputs before using them as numbers or structured data.',
+    appliesTo: ['correctness', 'jsonnet'],
+    matches: (c) => /\bstd\.ext(?:Var|Code)\s*\(/.test(c.addedText),
+  },
+  {
+    id: 'zig-safety',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Zig memory-safety or failure escape hatch',
+    guidance:
+      'Pointer/integer casts and unchecked error or optional exits need a locally provable type, alignment, provenance, lifetime, and input invariant. In ReleaseFast and ReleaseSmall, a violated invariant can become silent illegal behavior rather than a checked failure.',
+    appliesTo: ['security', 'zig'],
+    matches: (c) =>
+      /@(?:ptrCast|alignCast|bitCast|ptrFromInt|intFromPtr)\s*\(/.test(c.addedText) ||
+      /\b(?:catch|orelse)\s+(?:unreachable|undefined)\b/.test(c.addedText),
+  },
+  {
+    id: 'r-runtime-safety',
+    category: 'security',
+    severityHint: 'high',
+    title: 'R dynamic evaluation or process boundary',
+    guidance:
+      'R code is evaluating text, starting a process, loading a script, or mutating a parent/global environment. Confirm the value is trusted or validated, shell arguments are not interpolated from input, and the side effect is an intentional part of the function contract.',
+    appliesTo: ['security', 'r'],
+    matches: (c) =>
+      /\beval\s*\(\s*parse\s*\(/.test(c.addedText) ||
+      /\b(?:system|system2|assign|source)\s*\(/.test(c.addedText) ||
+      /<<-|\b\.GlobalEnv\b/.test(c.addedText),
+  },
+  {
+    id: 'matlab-dynamic-code',
+    category: 'security',
+    severityHint: 'high',
+    title: 'MATLAB dynamic-code or shell boundary',
+    guidance:
+      'MATLAB is evaluating workspace text, interpreting a numeric string, or executing a shell command. Verify the text cannot be influenced by untrusted input; prefer `str2double` to `str2num` and a direct, validated API over workspace or shell evaluation.',
+    appliesTo: ['security', 'matlab'],
+    matches: (c) =>
+      /\b(?:eval|evalc|evalin|assignin|str2num)\s*\(/.test(c.addedText) ||
+      /\b(?:system|dos|unix)\s*\(/.test(c.addedText),
+  },
+  {
+    id: 'objective-c-runtime-safety',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Objective-C runtime or archive boundary',
+    guidance:
+      'Runtime selector/class lookup, swizzling, ABI-level dispatch, or legacy unarchiving can turn externally derived data into an unintended method call or object graph. Require a narrow allowlist and secure decoding with explicit allowed classes before treating the value as trusted.',
+    appliesTo: ['security', 'objective-c'],
+    matches: (c) =>
+      /\b(?:NSSelectorFromString|NSClassFromString|objc_msgSend|method_exchangeImplementations|class_replaceMethod)\s*\(/.test(
+        c.addedText,
+      ) ||
+      /\bperformSelector\w*\s*:|\bunarchiveObjectWith(?:Data|File)\s*:/.test(c.addedText),
+  },
+  {
+    id: 'smart-contract-security',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Security-sensitive smart-contract primitive',
+    guidance:
+      'This Solidity/Vyper change touches a primitive that can lose funds or bypass trust boundaries. Verify delegate targets and raw calls are fixed or allowlisted, authorization does not rely on `tx.origin`, arithmetic escapes have a proved bound, and block values are not used as value-bearing randomness.',
+    appliesTo: ['security', 'solidity', 'vyper'],
+    matches: (c) =>
+      /\btx\.origin\b|\bselfdestruct\s*\(|\bdelegatecall\b|\bdelegate_call\s*=\s*true\b/.test(c.addedText) ||
+      /\braw_call\s*\(|\bunsafe_(?:add|sub|mul|div)\s*\(/.test(c.addedText) ||
+      /\bblock\.(?:timestamp|number|prevrandao)\b|\bblockhash\s*\(/.test(c.addedText),
   },
 ];
 

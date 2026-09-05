@@ -53,6 +53,18 @@ export function defaultSkip(f: ChangedFile): string | null {
   if (/\.(gen\.go|pb\.go|pb\.cc|pb\.h)$/.test(path)) return 'generated';
   if (GENERATED_DIR.test(path)) return 'generated';
 
+  // Generated artifacts introduced by the upstream language support are no more
+  // reviewable than the existing protobuf/codegen forms above.
+  if (
+    /(^|\/)\.ipynb_checkpoints\//i.test(path) ||
+    /(^|\/)kitex_gen\/.*\.go$/i.test(path) ||
+    /\.capnp\.(h|go|ts)$/i.test(path) ||
+    /_capnp\.(rs|py)$/i.test(path) ||
+    /^lib\/.*\.sol$/i.test(path)
+  ) {
+    return 'generated';
+  }
+
   // Test files (mirrors open-code-review's default exclude set).
   if (
     /(^|\/)__tests__\//.test(path) ||
@@ -69,7 +81,13 @@ export function defaultSkip(f: ChangedFile): string | null {
     // `**/Tests/**/*.swift` — the directory form is matched case-insensitively
     // upstream, so both `Tests/` and `tests/` count.
     /(^|\/)\w*Tests?\.swift$/.test(path) ||
-    /(^|\/)[Tt]ests\/.*\.swift$/.test(path)
+    /(^|\/)[Tt]ests\/.*\.swift$/.test(path) ||
+    /(^|\/)tests\/.*\.r$/i.test(path) ||
+    /(^|\/)tests\/.*\.elm$/i.test(path) ||
+    /(^|\/)test\/.*\.zig$/i.test(path) ||
+    /_test\.zig$/i.test(path) ||
+    /\.t\.sol$/i.test(path) ||
+    /(^|\/)(test|tests)\/.*\.(sol|vy)$/i.test(path)
   ) {
     return 'test';
   }

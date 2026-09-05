@@ -100,7 +100,7 @@ sereview --version
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-9 (2026-08-22)"
+  "rulebookVersion": "sereview-rulebook-10 (2026-09-05)"
 }
 ```
 
@@ -177,6 +177,13 @@ console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 | `swift-security` | security | high |
 | `swift-concurrency` | concurrency | high |
 | `swift-runtime-safety` | correctness | medium |
+| `elm-production-safety` | correctness | high |
+| `jsonnet-external-input` | correctness | medium |
+| `zig-safety` | security | high |
+| `r-runtime-safety` | security | high |
+| `matlab-dynamic-code` | security | high |
+| `objective-c-runtime-safety` | security | high |
+| `smart-contract-security` | security | high |
 
 심각도 단계: `critical · high · medium · low · info`.
 

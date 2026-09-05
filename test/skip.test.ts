@@ -45,6 +45,14 @@ test('defaultSkip: generated-code files (.generated.*, .gen.go, .pb.{go,cc,h})',
     'api/v1/service.pb.go',
     'proto/message.pb.cc',
     'proto/message.pb.h',
+    'notebooks/.ipynb_checkpoints/analysis.ipynb',
+    'services/kitex_gen/user/service.go',
+    'generated/schema.capnp.h',
+    'generated/schema.capnp.go',
+    'generated/schema.capnp.ts',
+    'generated/schema_capnp.rs',
+    'generated/schema_capnp.py',
+    'lib/openzeppelin/Token.sol',
   ]) {
     assert.equal(defaultSkip(file(p)), 'generated', p);
   }
@@ -69,6 +77,13 @@ test('defaultSkip: test files', () => {
     'MyAppUITests/LaunchTests.swift',
     'Tests/AppTests/Mocks/MockService.swift',
     'tests/AppTests/Helpers/Helper.swift',
+    'analysis/tests/model.R',
+    'frontend/tests/App.elm',
+    'zig/test/unit/math.zig',
+    'zig/src/math_test.zig',
+    'contracts/Token.t.sol',
+    'contracts/test/Vault.sol',
+    'contracts/tests/Vault.vy',
   ]) {
     assert.equal(defaultSkip(file(p)), 'test', p);
   }
@@ -103,6 +118,7 @@ test('defaultSkip: normal source / docs files are kept', () => {
     'src/generated/code.go',
     'src/gen/util.go',
     'src/pb/client.go',
+    'src/lib/Math.sol',
   ]) {
     assert.equal(defaultSkip(file(p)), null, p);
   }

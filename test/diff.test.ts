@@ -241,3 +241,23 @@ test('parseDiff: an unquoted path containing a literal backslash stays untouched
   const [b] = parseDiff(d);
   assert.equal(b!.file.path, 'src\\weird.ts');
 });
+
+test('parseDiff: .m uses visible MATLAB declarations but retains Objective-C fallback', () => {
+  const matlab = parseDiff(`diff --git a/analysis/solve.m b/analysis/solve.m
+new file mode 100644
+--- /dev/null
++++ b/analysis/solve.m
+@@ -0,0 +1,1 @@
++function result = solve(input)
+`);
+  const objectiveC = parseDiff(`diff --git a/ios/ViewController.m b/ios/ViewController.m
+new file mode 100644
+--- /dev/null
++++ b/ios/ViewController.m
+@@ -0,0 +1,1 @@
++@interface ViewController : UIViewController
+`);
+
+  assert.equal(matlab[0]!.file.language, 'matlab');
+  assert.equal(objectiveC[0]!.file.language, 'objective-c');
+});

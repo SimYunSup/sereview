@@ -8,6 +8,30 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Upstream language and template coverage (rulebook v10):** `.elm`,
+  `.jsonnet`/`.libsonnet`, `.zig`, `.R`, `.ipynb`, `.thrift`, `.capnp`,
+  `.hbs`/`.mustache`, `.sol`, `.vy`, `.properties`, `.po`, and `.pot` now have
+  explicit language ids; notebooks reuse Python’s existing coverage. `.m` keeps
+  Objective-C as the public fallback but switches to MATLAB when a changed hunk
+  contains an unambiguous MATLAB declaration. Raw Handlebars/Mustache output now
+  matches `xss`, while dynamic partial selection matches `template-injection`.
+  New rules cover Elm debug artifacts that block optimized builds
+  (`elm-production-safety`), Jsonnet external inputs
+  (`jsonnet-external-input`), Zig pointer/failure escape hatches
+  (`zig-safety`), R evaluation/process/global-environment boundaries
+  (`r-runtime-safety`), MATLAB dynamic evaluation
+  (`matlab-dynamic-code`), Objective-C runtime/deserialization APIs
+  (`objective-c-runtime-safety`), and Solidity/Vyper security primitives
+  (`smart-contract-security`). The default skip filter now excludes Jupyter
+  checkpoints, Cap’n Proto/Kitex generated output, new language test layouts,
+  and vendored Solidity sources. Derived from upstream open-code-review
+  v1.9.5…v1.11.0 language and template rules. Wire-compatibility checks for
+  Thrift/Cap’n Proto, gettext/`.properties` correctness, and the remainder of
+  the per-language idiom guidance remain intentionally out of the deterministic
+  added-text matcher: they require the old schema/value or broader repository
+  context. Upstream’s model-agent, provider, session, and scan changes have no
+  sereview counterpart; its diff-command diagnostic fix is already covered by
+  Node’s `execFileSync` error message, which includes subprocess stderr.
 - **Astro support in the rulebook (rulebook v3):** the `xss` rule recognizes
   Astro's `set:html` sink and `.astro` maps to the `astro` language. Derived from
   upstream open-code-review's Astro rules (v1.6.5…v1.7.7 review).

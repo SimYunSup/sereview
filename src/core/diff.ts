@@ -4,19 +4,22 @@ import type { BundledFile, ChangedFile, DiffHunk, DiffLine, FileStatus } from '.
 const LANGUAGE_BY_EXT: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', mts: 'typescript', cts: 'typescript',
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-  py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', jl: 'julia',
+  py: 'python', ipynb: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', jl: 'julia',
   hs: 'haskell', lhs: 'haskell', nim: 'nim', nims: 'nim', nimble: 'nim', nix: 'nix',
   kt: 'kotlin', kts: 'kotlin', cs: 'csharp', php: 'php', phtml: 'php', swift: 'swift', scala: 'scala',
   c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
   m: 'objective-c', mm: 'objective-c',
   sql: 'sql', sh: 'shell', bash: 'shell', zsh: 'shell',
   html: 'html', css: 'css', scss: 'scss', less: 'less', vue: 'vue', svelte: 'svelte', astro: 'astro',
-  ftl: 'freemarker', ftlh: 'freemarker', ftlx: 'freemarker',
+  ftl: 'freemarker', ftlh: 'freemarker', ftlx: 'freemarker', hbs: 'handlebars', mustache: 'handlebars',
+  elm: 'elm', jsonnet: 'jsonnet', libsonnet: 'jsonnet', zig: 'zig', r: 'r',
+  thrift: 'thrift', capnp: 'capnp', sol: 'solidity', vy: 'vyper',
   // .tfstate is included alongside the upstream-mirrored .tf/.tfvars/.hcl set
   // so a committed state file (checked by the iac-security rule) is detected
   // as terraform rather than falling through as an unknown language.
   tf: 'terraform', tfvars: 'terraform', hcl: 'terraform', tfstate: 'terraform',
   bicep: 'bicep', proto: 'protobuf', prisma: 'prisma',
+  properties: 'properties', po: 'gettext', pot: 'gettext',
   json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', md: 'markdown',
 };
 
@@ -32,6 +35,24 @@ export function detectLanguage(path: string): string | undefined {
   const dot = base.lastIndexOf('.');
   if (dot <= 0) return undefined;
   return LANGUAGE_BY_EXT[base.slice(dot + 1).toLowerCase()];
+}
+
+// `.m` is shared by Objective-C and MATLAB. Keep `detectLanguage`'s established
+// Objective-C fallback, but use explicit MATLAB declarations visible in the diff
+// when building a packet so MATLAB-only rules do not fire on Objective-C code.
+const MATLAB_DECLARATION =
+  /^\s*(?:function(?:\s+(?:\[[^\]]+\]|\w+)\s*=\s*)?\s*[A-Za-z]\w*\b|classdef\b|arguments(?:\s*\([^)]*\))?\s*$)/;
+
+function detectLanguageForDiff(path: string, hunks: DiffHunk[]): string | undefined {
+  const language = detectLanguage(path);
+  if (language !== 'objective-c' || !/\.m$/i.test(path)) return language;
+
+  for (const hunk of hunks) {
+    for (const line of hunk.lines) {
+      if (line.type !== 'del' && MATLAB_DECLARATION.test(line.content)) return 'matlab';
+    }
+  }
+  return language;
 }
 
 /**
@@ -243,7 +264,7 @@ export function parseDiff(diff: string): BundledFile[] {
       previousPath = liveOld;
     }
 
-    const language = detectLanguage(path);
+    const language = detectLanguageForDiff(path, hunks);
     const file: ChangedFile = {
       path,
       ...(previousPath && previousPath !== path ? { previousPath } : {}),

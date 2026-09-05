@@ -68,7 +68,10 @@ already run. No separate API key is involved.
 `authz` · `npe` · `race` · `n-plus-1` · `github-actions-security` ·
 `template-injection` · `rust-macro-correctness` · `julia-security` ·
 `iac-security` · `haskell-security` · `nim-security` · `nix-reproducibility` ·
-`swift-security` · `swift-concurrency` · `swift-runtime-safety`.
+`swift-security` · `swift-concurrency` · `swift-runtime-safety` ·
+`elm-production-safety` · `jsonnet-external-input` · `zig-safety` ·
+`r-runtime-safety` · `matlab-dynamic-code` · `objective-c-runtime-safety` ·
+`smart-contract-security`.
 Each carries `guidance` in the packet describing what to check.
 Findings are not limited to these — they focus attention, they don't cap it.
 
