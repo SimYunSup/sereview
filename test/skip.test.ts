@@ -89,6 +89,62 @@ test('defaultSkip: test files', () => {
   }
 });
 
+test('defaultSkip: upstream language test patterns stay file-specific', () => {
+  for (const p of [
+    'src/test/kotlin/Example.kts',
+    'lib/ParserTest.fs',
+    'test/unit/parser.ml',
+    'src/test_handlers.py',
+    'src/handlers_test.py',
+    'rtl/tb_counter.sv',
+    'rtl/counter_tb.vhd',
+  ]) {
+    assert.equal(defaultSkip(file(p)), 'test', p);
+  }
+  for (const p of ['src/test_handlers.pyi', 'src/test_api.pyx', 'lib/ParserTests.fs', 'rtl/counter.vh']) {
+    assert.equal(defaultSkip(file(p)), null, p);
+  }
+});
+
+test('defaultSkip: credential paths are excluded, env templates remain reviewable', () => {
+  for (const p of [
+    '.env',
+    'config/.env.production',
+    'config/.ENV.Local',
+    'home/.ssh/config',
+    'home/.ssh/id_ed25519',
+    'secrets/id_rsa',
+    'config/.netrc',
+    'config/_netrc',
+    'config/.npmrc',
+    'config/.pypirc',
+    'config/.dockercfg',
+  ]) {
+    assert.equal(defaultSkip(file(p)), 'secret path', p);
+  }
+  for (const p of ['.env.example', 'config/.ENV.SAMPLE', 'config/.env.template', 'notes/env.production', 'src/id_rsa.ts']) {
+    assert.equal(defaultSkip(file(p)), null, p);
+  }
+});
+
+test('defaultSkip: dependency and build caches are not reviewable code', () => {
+  for (const p of [
+    'ui/bower_components/lib/index.js',
+    'ui/.pnpm-store/pkg/index.js',
+    'ui/.yarn/cache/pkg.zip',
+    'ui/.pnp.cjs',
+    'infra/.terraform/providers/plugin',
+    'infra/.terraform.lock.hcl',
+    'lib/__pycache__/module.pyc',
+    'lib/.venv/lib/app.py',
+    'rust/target/debug/main',
+    'build/.gradle/cache/module',
+    'ios/Pods/AFNetworking/AFNetworking.m',
+  ]) {
+    assert.ok(defaultSkip(file(p)), p);
+  }
+});
+
 test('defaultSkip: normal source / docs files are kept', () => {
   for (const p of [
     'src/index.ts',

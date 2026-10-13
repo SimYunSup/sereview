@@ -4,7 +4,7 @@ import type { BundledFile, MatchedRule, RuleContext, RuleDefinition } from './ty
 export type { RuleContext, RuleDefinition } from './types.ts';
 
 /** Bump when rule ids / semantics change so packets are traceable to a rulebook. */
-export const RULEBOOK_VERSION = 'sereview-rulebook-10 (2026-09-05)';
+export const RULEBOOK_VERSION = 'sereview-rulebook-11 (2026-10-13)';
 
 function buildContext(files: BundledFile[]): RuleContext {
   const addedParts: string[] = [];
@@ -23,9 +23,9 @@ function buildContext(files: BundledFile[]): RuleContext {
 }
 
 /**
- * The starter rulebook: a security-leaning set of twenty-seven heuristics. Each `matches`
- * is intentionally conservative — it flags *candidates* so the host Claude Code
- * session knows where to look; it never decides that a finding is real.
+ * The deterministic rulebook: security-leaning heuristics. Each `matches`
+ * intentionally flags candidates for the host reviewer to examine; it never
+ * decides that a finding is real.
  */
 export const RULEBOOK: RuleDefinition[] = [
   {
@@ -46,12 +46,16 @@ export const RULEBOOK: RuleDefinition[] = [
     severityHint: 'high',
     title: 'Possible XSS via an unescaped HTML sink',
     guidance:
-      'Data may reach an HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Raw Handlebars/Mustache interpolation (`{{{...}}}` / `{{& ...}}`) also bypasses the engines’ default HTML escaping. Confirm the value is escaped/sanitized for its output context, or rendered as text rather than HTML.',
-    appliesTo: ['frontend', 'javascript', 'typescript', 'html', 'vue', 'svelte', 'astro', 'handlebars'],
+      'Data may reach an unescaped HTML sink (innerHTML, dangerouslySetInnerHTML, document.write, v-html, insertAdjacentHTML, Astro set:html) or eval. Raw Handlebars/Mustache output, Jinja |safe / disabled autoescape, and Pug !{} / != bypass default escaping. Confirm the value is untrusted before reporting; use context-appropriate sanitization or render as text.',
+    appliesTo: ['frontend', 'javascript', 'typescript', 'html', 'vue', 'svelte', 'astro', 'handlebars', 'jinja', 'pug'],
     matches: (c) =>
       /\b(innerhtml|outerhtml|dangerouslysetinnerhtml|insertadjacenthtml|document\.write|v-html)\b|\bset:html\b|\beval\s*\(|\{\{\{\s*[^}]+\}\}\}|\{\{&\s*[^}]+\}\}/i.test(
         c.addedText,
-      ),
+      ) ||
+      (c.languages.has('jinja') && (/\|\s*safe\b/.test(c.addedText) ||
+        (/{%\s*autoescape\s+false\s*%}/i.test(c.addedText) && /\{\{[^}]+\}\}/.test(c.addedText)))) ||
+      (c.languages.has('pug') && (/!\{[^}]+\}/.test(c.addedText) ||
+        /^(?!\s*(?:\/\/|\/\/-)).*!=\s*(?!attributes(?:\.|\[))[\w$(]/m.test(c.addedText))),
   },
   {
     id: 'ssrf',
@@ -418,6 +422,59 @@ export const RULEBOOK: RuleDefinition[] = [
       /\btx\.origin\b|\bselfdestruct\s*\(|\bdelegatecall\b|\bdelegate_call\s*=\s*true\b/.test(c.addedText) ||
       /\braw_call\s*\(|\bunsafe_(?:add|sub|mul|div)\s*\(/.test(c.addedText) ||
       /\bblock\.(?:timestamp|number|prevrandao)\b|\bblockhash\s*\(/.test(c.addedText),
+  },
+  {
+    id: 'fsharp-partial-unwrap',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'F# partial option unwrap',
+    guidance:
+      '`Option.get` or `ValueOption.get` raises when the value is None or ValueNone. Verify the option is proven present on every reachable path, particularly for external data, and handle missing values explicitly otherwise.',
+    appliesTo: ['correctness', 'fsharp'],
+    matches: (c) => /\b(?:Option|ValueOption)\.get\s*(?:\(|\w)/.test(c.addedText),
+  },
+  {
+    id: 'ocaml-unsafe-interop',
+    category: 'security',
+    severityHint: 'high',
+    title: 'OCaml unsafe representation cast',
+    guidance:
+      '`Obj.magic` and `Obj.obj` bypass OCaml/ReasonML type checks. Require a precise, locally documented representation and lifetime invariant at this boundary; an incompatible runtime value can crash or corrupt data.',
+    appliesTo: ['security', 'ocaml'],
+    matches: (c) => /\bObj\.(?:magic|obj)\s*(?:\(|\w)/.test(c.addedText),
+  },
+  {
+    id: 'rego-broad-allow',
+    category: 'security',
+    severityHint: 'high',
+    title: 'Rego unconditional allow decision',
+    guidance:
+      'An allow decision appears unconditional (`default allow` true, `allow if true`, or an empty allow body). Verify this is an intentional policy default rather than a bypass; check the actual caller decision path and deny constraints before treating it as a vulnerability.',
+    appliesTo: ['security', 'rego'],
+    matches: (c) =>
+      /^\s*default\s+allow\s*(?::=|=)\s*true\b/m.test(c.addedText) ||
+      /^\s*allow\s+if\s+true(?:\s*(?:#.*)?)?$/m.test(c.addedText) ||
+      /^\s*allow\s*\{\s*\}/m.test(c.addedText),
+  },
+  {
+    id: 'verilog-casex',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'Verilog casex masks unknown values',
+    guidance:
+      '`casex` treats X/Z bits as wildcards, which can hide unknown-state or priority bugs in simulation and produce a synthesis mismatch. Check whether exact `case`, explicit masks, or `casez` with a justified don’t-care is safer.',
+    appliesTo: ['correctness', 'verilog'],
+    matches: (c) => /\bcasex\s*\(/.test(c.addedText),
+  },
+  {
+    id: 'vhdl-nonstandard-arithmetic',
+    category: 'correctness',
+    severityHint: 'medium',
+    title: 'VHDL nonstandard arithmetic package',
+    guidance:
+      'Importing IEEE std_logic_arith/unsigned/signed selects nonstandard overloads whose width and signedness differ across tools. Check arithmetic under the project toolchain and prefer numeric_std with explicit conversions when changing this code.',
+    appliesTo: ['correctness', 'vhdl'],
+    matches: (c) => /\buse\s+ieee\.std_logic_(?:arith|unsigned|signed)\.all\s*;/i.test(c.addedText),
   },
 ];
 

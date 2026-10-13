@@ -100,7 +100,7 @@ sereview --version
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-10 (2026-09-05)"
+  "rulebookVersion": "sereview-rulebook-11 (2026-10-13)"
 }
 ```
 
@@ -110,6 +110,13 @@ sereview --version
   판정이 아니라서, 목록이 비어 있다고 그 번들이 깨끗하다는 뜻은 아니다.
 - **`skipped`** — 리뷰에서 제외한 파일(바이너리·락파일 등)을 이유와 함께 남긴다. 그래야
   뭐가 빠졌는지 조용히 사라지지 않는다.
+
+CLI의 기본 제외 필터는 자격 증명 경로(`.env`, `.env.*` — 단 `.env.example`,
+`.env.sample`, `.env.template` 제외; `.ssh/`; 개인 키 파일명; `.netrc`,
+`.npmrc`, `.pypirc`, `.dockercfg`), 테스트, 의존성·빌드 캐시를 제외한다.
+제외 경로와 이유는 `skipped`에 남고 해당 hunk는 패킷에 포함되지 않는다.
+이는 경로 필터이며 **다른 파일의 비밀 값을 마스킹하는 기능은 아니다**.
+라이브러리에서는 `skip: defaultSkip`으로 명시적으로 적용한다.
 
 ## 리뷰 스킬
 
@@ -184,6 +191,11 @@ console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 | `matlab-dynamic-code` | security | high |
 | `objective-c-runtime-safety` | security | high |
 | `smart-contract-security` | security | high |
+| `fsharp-partial-unwrap` | correctness | medium |
+| `ocaml-unsafe-interop` | security | high |
+| `rego-broad-allow` | security | high |
+| `verilog-casex` | correctness | medium |
+| `vhdl-nonstandard-arithmetic` | correctness | medium |
 
 심각도 단계: `critical · high · medium · low · info`.
 
@@ -192,6 +204,12 @@ console.log(serializePacket(packet));     // 보기 좋게 정리된 JSON
 `secret-exposure`)은 언어와 무관하게 어떤 파일에서도 발동하고, 언어를 감지할 수 없는
 파일에서는 이런 언어 무관 룰만 발동한다. 매칭된 룰에는 발동한 번들 속 파일 경로가
 `matchedPaths`로 함께 담긴다.
+
+[Open Code Review v1.13.0](https://github.com/alibaba/open-code-review/releases/tag/v1.13.0)까지
+업스트림 변경을 반영했다. 룰셋 v11은 F#, OCaml/ReasonML, Rego,
+Verilog/SystemVerilog, VHDL 신호를 추가하고, Jinja·Pug의 이스케이프 우회는
+기존 `xss` 룰로 다룬다. Python 스텁 파일(`.pyi`)은 Python 룰을 재사용한다.
+모두 추가된 텍스트를 바탕으로 한 힌트이며 완전한 언어 분석기는 아니다.
 
 ## 아키텍처 (Open Code Review에서 가져옴)
 

@@ -6,7 +6,7 @@ import type { ReviewSource } from '../core/index.ts';
 import { parseCliArgs, parsePrRef } from './args.ts';
 import type { CliArgs } from './args.ts';
 
-const HELP = `sereview — deterministic review-packet builder for Claude Code (no API key).
+const HELP = `sereview — deterministic review-packet builder for host agents (no API key).
 
 Usage:
   sereview packet <pr-url | owner/repo#number>   Build a packet from a GitHub PR
@@ -19,8 +19,8 @@ Options:
   --version                 Show version
 
 The packet is printed as JSON to stdout. The review itself is performed by your
-Claude Code session via the bundled skill (skill/SKILL.md) — sereview never
-calls an LLM and needs no API key.
+host agent (see skill/SKILL.md or docs/codex.md) — sereview never calls an LLM
+and needs no API key.
 `;
 
 function readVersion(): string {
@@ -34,10 +34,14 @@ function readVersion(): string {
   }
 }
 
-/** Run a `gh` subcommand, surfacing a clear error if the CLI is missing/unauthed. */
+/** Run `gh` without invoking its configured pager (which can block packet output). */
 function gh(args: string[]): string {
   try {
-    return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    return execFileSync('gh', args, {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      env: { ...process.env, GH_PAGER: 'cat', GIT_PAGER: 'cat' },
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(

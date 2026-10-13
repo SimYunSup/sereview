@@ -261,3 +261,31 @@ new file mode 100644
   assert.equal(matlab[0]!.file.language, 'matlab');
   assert.equal(objectiveC[0]!.file.language, 'objective-c');
 });
+
+test('parseDiff: mixed Git quoting and quoted rename metadata preserve exact paths', () => {
+  const quotedNew = 'diff --git a/src/old.ts "b/src/new\\tname.ts"\n';
+  const [renamed] = parseDiff(quotedNew);
+  assert.equal(renamed!.file.path, 'src/new\tname.ts');
+
+  const quotedOld = 'diff --git "a/src/old\\\"name.ts" b/src/new.ts\n';
+  const [other] = parseDiff(quotedOld);
+  assert.equal(other!.file.path, 'src/new.ts');
+
+  const metadata = 'diff --git "a/src/old\\\"name.ts" "b/src/new\\tname.ts"\n' +
+    'rename from "src/old\\\"name.ts"\nrename to "src/new\\tname.ts"\n';
+  const [moved] = parseDiff(metadata);
+  assert.equal(moved!.file.previousPath, 'src/old"name.ts');
+  assert.equal(moved!.file.path, 'src/new\tname.ts');
+
+  // Literal non-ASCII survives inside a quoted path with core.quotepath=false.
+  const [unicode] = parseDiff('diff --git "a/src/café\\tfile.ts" "b/src/café\\tfile.ts"\n');
+  assert.equal(unicode!.file.path, 'src/café\tfile.ts');
+});
+
+test('parseDiff: /dev/null without mode headers still identifies added/deleted files', () => {
+  const added = 'diff --git a/new.py b/new.py\r\n--- /dev/null\r\n+++ b/new.py\r\n@@ -0,0 +1,1 @@\r\n+print(1)\r\n';
+  const deleted = 'diff --git a/old.py b/old.py\r\n--- a/old.py\r\n+++ /dev/null\r\n@@ -1,1 +0,0 @@\r\n-print(1)\r\n';
+  assert.equal(parseDiff(added)[0]!.file.status, 'added');
+  assert.equal(parseDiff(deleted)[0]!.file.status, 'deleted');
+  assert.equal(parseDiff(deleted)[0]!.file.path, 'old.py');
+});

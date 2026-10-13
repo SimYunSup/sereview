@@ -9,6 +9,8 @@ Derived material:
   - The review rule taxonomy (security-focused rule set + severity levels).
   - The deterministic review pipeline design:
     diff parsing -> file bundling -> rule matching -> review packet.
+  - Language-specific review signals, default path exclusions, and host review
+    guidance adapted from upstream releases through v1.13.0.
 
 Changes from the original:
   - Reimplemented in TypeScript (the original is written in Go).

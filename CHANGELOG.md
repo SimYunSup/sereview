@@ -8,6 +8,40 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Upstream v1.13.0 synchronization (rulebook v11):** reviewed
+  [v1.11.0…v1.13.0](https://github.com/alibaba/open-code-review/compare/v1.11.0...v1.13.0).
+  Added F# (`.fs`/`.fsi`/`.fsx`), OCaml/ReasonML (`.ml`/`.mli`/`.re`/`.rei`),
+  Jinja (`.jinja2`/`.j2`), Pug, Rego, Verilog/SystemVerilog (`.v`/`.sv`/`.vh`),
+  VHDL (`.vhd`/`.vhdl`), and Python stub (`.pyi`) language mappings. New hints:
+  `fsharp-partial-unwrap`, `ocaml-unsafe-interop`, `rego-broad-allow`,
+  `verilog-casex`, and `vhdl-nonstandard-arithmetic`. Jinja escaping bypasses
+  and Pug raw output extend `xss`. Broader language-idiom guidance and Python
+  unused-import analysis remain outside the added-text matcher.
+- **Default exclusions:** credential paths now produce `secret path` skip
+  records; `.env.example`, `.env.sample`, and `.env.template` remain reviewable.
+  Added upstream dependency/build caches, `.terraform.lock.hcl`, Python
+  `test_*.py`/`*_test.py`, and new language test layouts. The CLI applies these
+  defaults; library callers explicitly pass `skip: defaultSkip`. Path filtering
+  does not redact secrets embedded in otherwise reviewable files.
+- **Diff pathname fixes:** independently quoted header operands, quoted
+  rename/copy metadata, escaped quotes, and literal Unicode in quoted paths
+  retain their identity. Malformed octal escapes are not silently decoded into
+  a different path. `/dev/null` identifies added/deleted files even without
+  file-mode headers. Existing CRLF and deleted-path support remains intact.
+- **Host review workflow:** Claude Code and Codex guides pin the current `^0.3`
+  CLI, disable Git pagers/external diff/text conversion in suggested commands,
+  account for every bundle and skipped file, and explain deleted-file context
+  without inventing old-side finding anchors. Repository instructions are
+  treated as review data, not authority. PR retrieval explicitly disables
+  configured `gh`/Git pagers. Packet schema remains 1.
+  Upstream provider/authentication, ACP, session, viewer, model grouping,
+  prompt-budget, and workspace-scanning features have no deterministic
+  sereview counterpart and are not imported.
+- **Behavior-focused regression coverage:** added language-gating, safe/unsafe
+  rule-boundary, path-exclusion, and diff-path cases. Removed the full-packet
+  golden snapshot and fixtures, which pinned mutable guidance wording; packet
+  behavior and serialization remain covered by focused tests.
+
 - **Upstream language and template coverage (rulebook v10):** `.elm`,
   `.jsonnet`/`.libsonnet`, `.zig`, `.R`, `.ipynb`, `.thrift`, `.capnp`,
   `.hbs`/`.mustache`, `.sol`, `.vy`, `.properties`, `.po`, and `.pot` now have
@@ -40,8 +74,6 @@ to [Semantic Versioning](https://semver.org/).
   matched rule set (the existing `rules` static override still wins).
 - **`MatchedRule.matchedPaths`:** the changed files a rule fired on, in diff
   order. Optional, so the packet stays `schemaVersion` 1.
-- **Golden-packet regression test:** freezes the serialized packet for a
-  representative diff; regenerate with `UPDATE_GOLDEN=1 pnpm test`.
 - **`template-injection` rule (rulebook v5):** FreeMarker SSTI signals
   (`?new()`, `?eval`, `?api`, `Execute`/`ObjectConstructor`, dynamic
   `<#include>`, `?no_esc`), with `.ftl`/`.ftlh`/`.ftlx` mapping to a new

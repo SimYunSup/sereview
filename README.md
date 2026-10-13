@@ -103,7 +103,7 @@ data — the review happens when a Claude Code session consumes it via the
   ],
   "skipped": [ { "path": "logo.png", "reason": "binary" } ],
   "stats": { "files": 2, "additions": 2, "deletions": 1, "bundles": 1 },
-  "rulebookVersion": "sereview-rulebook-10 (2026-09-05)"
+  "rulebookVersion": "sereview-rulebook-11 (2026-10-13)"
 }
 ```
 
@@ -113,6 +113,13 @@ data — the review happens when a Claude Code session consumes it via the
   verdicts. An empty list does not mean a bundle is clean.
 - **`skipped`** records files left out of review (binary, lockfiles, …) with a
   reason, so nothing silently disappears.
+
+The CLI's default skip filter excludes credential paths (`.env` and
+`.env.*`, except `.env.example`, `.env.sample`, and `.env.template`; `.ssh/`;
+private-key basenames; `.netrc`, `.npmrc`, `.pypirc`, and `.dockercfg`), tests,
+and dependency/build caches. Exclusions appear in `skipped`; their hunks are
+not included. This is path filtering, **not secret redaction** of other files.
+Library callers opt in with `skip: defaultSkip`.
 
 ## The review skill
 
@@ -188,6 +195,11 @@ A security-leaning starter set, used as **hints** for the reviewer:
 | `matlab-dynamic-code` | security | high |
 | `objective-c-runtime-safety` | security | high |
 | `smart-contract-security` | security | high |
+| `fsharp-partial-unwrap` | correctness | medium |
+| `ocaml-unsafe-interop` | security | high |
+| `rego-broad-allow` | security | high |
+| `verilog-casex` | correctness | medium |
+| `vhdl-nonstandard-arithmetic` | correctness | medium |
 
 Severity scale: `critical · high · medium · low · info`.
 
@@ -196,6 +208,12 @@ is one it covers (`appliesTo`). Rules scoped only by tag (e.g. `secret-exposure`
 tagged `any`) are language-agnostic and can fire on any file; a file whose
 language can't be detected triggers only those. A matched rule also carries
 `matchedPaths` — the changed files in the bundle it fired on.
+
+Upstream coverage is synchronized through
+[Open Code Review v1.13.0](https://github.com/alibaba/open-code-review/releases/tag/v1.13.0).
+Rulebook v11 adds F#, OCaml/ReasonML, Rego, Verilog/SystemVerilog, and VHDL
+signals; Jinja and Pug escaping bypasses reuse `xss`. Python stub files (`.pyi`)
+reuse Python coverage. These are changed-text hints, not full language analyzers.
 
 ## Architecture (from Open Code Review)
 

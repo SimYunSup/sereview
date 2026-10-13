@@ -143,8 +143,8 @@ test('matchRules: results follow rulebook order and are unique', () => {
   assert.equal(new Set(order).size, order.length);
 });
 
-test('RULEBOOK exposes all twenty-seven rules and a version string', () => {
-  assert.equal(RULEBOOK.length, 27);
+test('RULEBOOK exposes all thirty-two rules and a version string', () => {
+  assert.equal(RULEBOOK.length, 32);
   assert.equal(typeof RULEBOOK_VERSION, 'string');
   assert.ok(RULEBOOK_VERSION.length > 0);
   const expected = [
@@ -153,7 +153,8 @@ test('RULEBOOK exposes all twenty-seven rules and a version string', () => {
     'haskell-security', 'nim-security', 'nix-reproducibility',
     'swift-security', 'swift-concurrency', 'swift-runtime-safety',
     'elm-production-safety', 'jsonnet-external-input', 'zig-safety', 'r-runtime-safety', 'matlab-dynamic-code',
-    'objective-c-runtime-safety', 'smart-contract-security',
+    'objective-c-runtime-safety', 'smart-contract-security', 'fsharp-partial-unwrap', 'ocaml-unsafe-interop',
+    'rego-broad-allow', 'verilog-casex', 'vhdl-nonstandard-arithmetic',
   ];
   assert.deepEqual([...RULEBOOK.map((r) => r.id)].sort(), [...expected].sort());
 });
@@ -534,4 +535,51 @@ new file mode 100644
 `);
   assert.equal(files[0]!.file.language, 'matlab');
   assert.ok(ids(files).includes('matlab-dynamic-code'));
+});
+
+test('new language extensions select their reviewer signals', () => {
+  const cases = [
+    ['src/Inventory.fs', 'let item = Option.get maybeItem', 'fsharp-partial-unwrap'],
+    ['src/Inventory.fsi', 'val item: string', null],
+    ['scripts/report.fsx', 'let item = ValueOption.get candidate', 'fsharp-partial-unwrap'],
+    ['src/unsafe.ml', 'let item = Obj.magic value', 'ocaml-unsafe-interop'],
+    ['src/unsafe.mli', 'val unsafe : int -> string', null],
+    ['src/unsafe.re', 'let item = Obj.obj(value);', 'ocaml-unsafe-interop'],
+    ['src/unsafe.rei', 'let unsafe: int => string;', null],
+    ['policy/auth.rego', 'default allow := true', 'rego-broad-allow'],
+    ['rtl/control.sv', 'casex (state)', 'verilog-casex'],
+    ['rtl/control.v', 'casex (state)', 'verilog-casex'],
+    ['rtl/defs.vh', 'casex (state)', 'verilog-casex'],
+    ['rtl/counter.vhd', 'use IEEE.std_logic_unsigned.all;', 'vhdl-nonstandard-arithmetic'],
+    ['rtl/counter.vhdl', 'use ieee.std_logic_arith.all;', 'vhdl-nonstandard-arithmetic'],
+  ] as const;
+  for (const [path, line, rule] of cases) {
+    assert.ok(detectLanguage(path), path);
+    if (rule) assert.ok(ids([added(path, line)]).includes(rule), path);
+  }
+  assert.equal(detectLanguage('src/types.pyi'), 'python');
+});
+
+test('explicit Jinja/Pug escaping bypasses use existing xss rule, not ordinary escaped output', () => {
+  assert.equal(detectLanguage('views/page.jinja2'), 'jinja');
+  assert.equal(detectLanguage('views/page.j2'), 'jinja');
+  assert.equal(detectLanguage('views/page.pug'), 'pug');
+  assert.ok(ids([added('views/page.jinja2', '<p>{{ profile.bio | safe }}</p>')]).includes('xss'));
+  assert.ok(ids([added('views/page.j2', '{% autoescape false %}', '{{ profile.bio }}')]).includes('xss'));
+  assert.ok(ids([added('views/page.pug', 'p!= profile.bio')]).includes('xss'));
+  assert.ok(ids([added('views/page.pug', 'p !{profile.bio}')]).includes('xss'));
+  assert.ok(!ids([added('views/page.j2', '<p>{{ profile.bio }}</p>')]).includes('xss'));
+  assert.ok(!ids([added('views/page.j2', '{% autoescape false %}', '<p>static only</p>')]).includes('xss'));
+  assert.ok(!ids([added('views/page.pug', 'p= profile.bio')]).includes('xss'));
+  assert.ok(!ids([added('views/page.pug', 'p!= attributes.name')]).includes('xss'));
+});
+
+test('new reviewer signals remain scoped to meaningful constructs and languages', () => {
+  assert.ok(!ids([added('app/main.fs', 'let selected = option |> Option.defaultValue fallback')]).includes('fsharp-partial-unwrap'));
+  assert.ok(!ids([added('app/main.ml', 'let selected = Option.value item ~default:fallback')]).includes('ocaml-unsafe-interop'));
+  assert.ok(!ids([added('auth/allow.rego', 'default allow := false', 'allow if input.user.role == "admin"')]).includes('rego-broad-allow'));
+  assert.ok(ids([added('auth/allow.rego', 'allow if true')]).includes('rego-broad-allow'));
+  assert.ok(!ids([added('rtl/control.sv', 'casez (state)')]).includes('verilog-casex'));
+  assert.ok(!ids([added('rtl/counter.vhdl', 'use IEEE.numeric_std.all;')]).includes('vhdl-nonstandard-arithmetic'));
+  assert.ok(!ids([added('docs/sample.md', 'casex (state)')]).includes('verilog-casex'));
 });

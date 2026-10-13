@@ -4,7 +4,8 @@ import type { BundledFile, ChangedFile, DiffHunk, DiffLine, FileStatus } from '.
 const LANGUAGE_BY_EXT: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', mts: 'typescript', cts: 'typescript',
   js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-  py: 'python', ipynb: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', jl: 'julia',
+  py: 'python', pyi: 'python', ipynb: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', jl: 'julia',
+  fs: 'fsharp', fsi: 'fsharp', fsx: 'fsharp', ml: 'ocaml', mli: 'ocaml', re: 'ocaml', rei: 'ocaml',
   hs: 'haskell', lhs: 'haskell', nim: 'nim', nims: 'nim', nimble: 'nim', nix: 'nix',
   kt: 'kotlin', kts: 'kotlin', cs: 'csharp', php: 'php', phtml: 'php', swift: 'swift', scala: 'scala',
   c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
@@ -12,7 +13,9 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   sql: 'sql', sh: 'shell', bash: 'shell', zsh: 'shell',
   html: 'html', css: 'css', scss: 'scss', less: 'less', vue: 'vue', svelte: 'svelte', astro: 'astro',
   ftl: 'freemarker', ftlh: 'freemarker', ftlx: 'freemarker', hbs: 'handlebars', mustache: 'handlebars',
+  jinja2: 'jinja', j2: 'jinja', pug: 'pug', rego: 'rego',
   elm: 'elm', jsonnet: 'jsonnet', libsonnet: 'jsonnet', zig: 'zig', r: 'r',
+  v: 'verilog', sv: 'verilog', vh: 'verilog', vhd: 'vhdl', vhdl: 'vhdl',
   thrift: 'thrift', capnp: 'capnp', sol: 'solidity', vy: 'vyper',
   // .tfstate is included alongside the upstream-mirrored .tf/.tfvars/.hcl set
   // so a committed state file (checked by the iac-security rule) is detected
@@ -55,40 +58,50 @@ function detectLanguageForDiff(path: string, hunks: DiffHunk[]): string | undefi
   return language;
 }
 
+const SIMPLE_ESCAPES: Record<string, number> = {
+  '\\': 0x5c, '"': 0x22, t: 0x09, n: 0x0a, r: 0x0d,
+  b: 0x08, f: 0x0c, a: 0x07, v: 0x0b,
+};
+const UTF8_DECODER = new TextDecoder();
+
 /**
  * Decode a git C-quoted path body (quotes already stripped): octal byte
- * escapes (`\ooo`, 1–3 octal digits — each is a raw UTF-8 byte, not a code
- * point) and the standard backslash escapes (`\\ \" \t \n \r \b \f \a \v`),
- * then decode the resulting byte sequence as UTF-8. Unescaped characters are
- * ASCII (git only C-quotes when it needs to) and pass through as-is.
+ * escapes (`\ooo`, exactly three octal digits — each is a raw UTF-8 byte,
+ * not a code point) and standard backslash escapes (`\\ \" \t \n \r \b \f \a \v`).
+ * Literal non-ASCII (possible with core.quotepath=false) remains UTF-8.
+ * Invalid escapes are refused rather than silently aliasing a different path.
  */
-function decodeCQuoted(body: string): string {
-  const SIMPLE_ESCAPES: Record<string, number> = {
-    '\\': 0x5c, '"': 0x22, t: 0x09, n: 0x0a, r: 0x0d,
-    b: 0x08, f: 0x0c, a: 0x07, v: 0x0b,
-  };
+function decodeCQuoted(body: string): string | undefined {
   const bytes: number[] = [];
   for (let i = 0; i < body.length; i++) {
     const ch = body[i]!;
     if (ch !== '\\') {
-      bytes.push(ch.charCodeAt(0));
+      const codepoint = body.codePointAt(i)!;
+      if (codepoint < 0x80) bytes.push(codepoint);
+      else if (codepoint < 0x800) bytes.push(0xc0 | (codepoint >> 6), 0x80 | (codepoint & 0x3f));
+      else if (codepoint < 0x10000) {
+        bytes.push(0xe0 | (codepoint >> 12), 0x80 | ((codepoint >> 6) & 0x3f), 0x80 | (codepoint & 0x3f));
+      } else {
+        bytes.push(0xf0 | (codepoint >> 18), 0x80 | ((codepoint >> 12) & 0x3f),
+          0x80 | ((codepoint >> 6) & 0x3f), 0x80 | (codepoint & 0x3f));
+        i++;
+      }
       continue;
     }
     const next = body[i + 1];
-    if (next !== undefined && next in SIMPLE_ESCAPES) {
+    if (next !== undefined && Object.hasOwn(SIMPLE_ESCAPES, next)) {
       bytes.push(SIMPLE_ESCAPES[next]!);
       i++;
       continue;
     }
-    const octal = /^[0-7]{1,3}/.exec(body.slice(i + 1));
-    if (octal) {
-      bytes.push(Number.parseInt(octal[0], 8) & 0xff);
-      i += octal[0].length;
-      continue;
-    }
-    bytes.push(0x5c); // unrecognized escape: keep the backslash literally
+    const octal = /^[0-7]{3}/.exec(body.slice(i + 1));
+    if (!octal) return undefined;
+    const byte = Number.parseInt(octal[0], 8);
+    if (byte > 0xff) return undefined;
+    bytes.push(byte);
+    i += 3;
   }
-  return new TextDecoder().decode(new Uint8Array(bytes));
+  return UTF8_DECODER.decode(new Uint8Array(bytes));
 }
 
 /**
@@ -99,7 +112,7 @@ function decodeCQuoted(body: string): string {
  */
 function unquote(p: string): string {
   return p.length >= 2 && p.startsWith('"') && p.endsWith('"')
-    ? decodeCQuoted(p.slice(1, -1))
+    ? decodeCQuoted(p.slice(1, -1)) ?? p
     : p;
 }
 
@@ -109,12 +122,41 @@ function stripPrefix(p: string): string {
   return p.startsWith('a/') || p.startsWith('b/') ? p.slice(2) : p;
 }
 
+/** Parse one C-quoted operand, respecting escaped quotation marks. */
+function quotedGitPath(s: string): { path: string; remaining: string } | undefined {
+  if (!s.startsWith('"')) return undefined;
+  for (let i = 1; i < s.length; i++) {
+    if (s[i] === '\\') { i++; continue; }
+    if (s[i] === '"') {
+      const path = decodeCQuoted(s.slice(1, i));
+      return path === undefined ? undefined : { path, remaining: s.slice(i + 1) };
+    }
+  }
+  return undefined;
+}
+
 /** Best-effort path extraction from a `diff --git a/<old> b/<new>` header line. */
 function parseGitHeaderPaths(header: string): { old?: string; new?: string } {
   const rest = header.slice('diff --git '.length);
+  // Git quotes the sides independently: renames may quote only one pathname.
   if (rest.startsWith('"')) {
-    const m = /^"(.*?)" "(.*?)"$/.exec(rest);
-    if (m) return { old: stripPrefix(decodeCQuoted(m[1]!)), new: stripPrefix(decodeCQuoted(m[2]!)) };
+    const first = quotedGitPath(rest);
+    if (first?.remaining.startsWith(' ')) {
+      const secondText = first.remaining.slice(1);
+      const second = quotedGitPath(secondText);
+      if (second?.remaining === '') return { old: stripPrefix(first.path), new: stripPrefix(second.path) };
+      if (!second && secondText.startsWith('b/')) {
+        return { old: stripPrefix(first.path), new: stripPrefix(secondText) };
+      }
+    }
+  } else {
+    const quotedNew = rest.indexOf(' "b/');
+    if (quotedNew >= 0 && rest.startsWith('a/')) {
+      const second = quotedGitPath(rest.slice(quotedNew + 1));
+      if (second?.remaining === '') {
+        return { old: stripPrefix(rest.slice(0, quotedNew)), new: stripPrefix(second.path) };
+      }
+    }
   }
   const parts = rest.split(' ');
   if (parts.length === 2) return { old: stripPrefix(parts[0]!), new: stripPrefix(parts[1]!) };
@@ -169,10 +211,10 @@ export function parseDiff(diff: string): BundledFile[] {
       if (l.startsWith('diff --git ') || l.startsWith('@@ ')) break;
       if (l.startsWith('new file mode')) status = 'added';
       else if (l.startsWith('deleted file mode')) status = 'deleted';
-      else if (l.startsWith('rename from ')) { renameFrom = l.slice(12); status = 'renamed'; }
-      else if (l.startsWith('rename to ')) { renameTo = l.slice(10); status = 'renamed'; }
-      else if (l.startsWith('copy from ')) { renameFrom = l.slice(10); copied = true; }
-      else if (l.startsWith('copy to ')) { renameTo = l.slice(8); copied = true; }
+      else if (l.startsWith('rename from ')) { renameFrom = unquote(l.slice(12)); status = 'renamed'; }
+      else if (l.startsWith('rename to ')) { renameTo = unquote(l.slice(10)); status = 'renamed'; }
+      else if (l.startsWith('copy from ')) { renameFrom = unquote(l.slice(10)); copied = true; }
+      else if (l.startsWith('copy to ')) { renameTo = unquote(l.slice(8)); copied = true; }
       else if (l.startsWith('Binary files') || l.startsWith('GIT binary patch')) binary = true;
       else if (l.startsWith('--- ')) oldPath = stripPrefix(unquote(l.slice(4)));
       else if (l.startsWith('+++ ')) newPath = stripPrefix(unquote(l.slice(4)));
@@ -244,6 +286,10 @@ export function parseDiff(diff: string): BundledFile[] {
     const fromHeader = parseGitHeaderPaths(header);
     const liveOld = oldPath && oldPath !== '/dev/null' ? oldPath : undefined;
     const liveNew = newPath && newPath !== '/dev/null' ? newPath : undefined;
+    // Some unified diff producers omit the file-mode header: /dev/null still
+    // unambiguously identifies an addition or deletion.
+    if (status === 'modified' && oldPath === '/dev/null') status = 'added';
+    if (status === 'modified' && newPath === '/dev/null') status = 'deleted';
 
     let path: string;
     let previousPath: string | undefined;
